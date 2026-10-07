@@ -1,0 +1,49 @@
+### Environment page
+GET http://127.0.0.1:8000/helix/
+
+### Saved environments
+GET http://127.0.0.1:8000/helix/api/environments
+Accept: application/json
+
+### Save an empty-service export with a minimal text template
+POST http://127.0.0.1:8000/helix/api/environments
+Content-Type: application/json
+
+{
+  "name": "Development",
+  "export": {
+    "versionInfo": {"versionInfo": {"sbVersion": "25.3.02"}},
+    "tenantConfig": {"creditManagementEnabled": false},
+    "services": [],
+    "serviceTypes": {
+      "1": {
+        "id": "1",
+        "name": "IT Request",
+        "templateType": "SERVICE",
+        "fields": [
+          {"id": "1", "name": "service_excerpt", "title": "Service Excerpt", "type": "MULTILINE_INPUT", "required": true},
+          {"id": "2", "name": "service_description", "title": "Service Description", "type": "RICH_INPUT", "required": true}
+        ]
+      }
+    },
+    "categories": {}
+  }
+}
+
+### Use actual IDs returned by the API
+@environment_id = REPLACE_WITH_SAVED_ENVIRONMENT_ID
+@package_id = REPLACE_WITH_GENERATED_PACKAGE_ID
+
+GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}
+
+### Generate three dummy services
+POST http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/generate
+Content-Type: application/json
+
+{"templateId": "1"}
+
+### Download JSON
+GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages/{{package_id}}
+
+### Download ZIP
+GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages/{{package_id}}?format=zip
