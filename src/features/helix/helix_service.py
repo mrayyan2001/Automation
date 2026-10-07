@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from common.annotation.service import Service
-from features.helix.service_generator import generate_services, inspect_export
+from features.helix.service_generator import create_service, inspect_export
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -65,17 +65,20 @@ class HelixService:
         row = self._environment(identifier)
         with self._connect() as db:
             batches = db.execute("SELECT id, created_at, summary FROM packages WHERE environment_id = ? ORDER BY created_at DESC", (identifier,)).fetchall()
-        return {"id": row["id"], "name": row["name"], "createdAt": row["created_at"], **json.loads(row["summary"]),
+        return {"id": row["id"], "name": row["name"], "createdAt": row["created_at"], **inspect_export(json.loads(row["export"])),
+                "categories": [{"id": key, "name": value.get("name", key), "parentId": value.get("parentId")} for key, value in json.loads(row["export"])["categories"].items()],
+                "tags": [{"id": key, **value} for key, value in json.loads(row["export"]).get("tags", {}).items()],
                 "packages": [{"id": b["id"], "createdAt": b["created_at"], **json.loads(b["summary"])} for b in batches]}
 
-    def generate(self, identifier: str, template_id: str) -> dict:
+    def create(self, identifier: str, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None) -> dict:
         row = self._environment(identifier)
         try:
-            export = generate_services(json.loads(row["export"]), template_id)
+            export = create_service(json.loads(row["export"]), template_id, name, field_values, category_ids, tags)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         package_id, created = str(uuid4()), datetime.now(timezone.utc).isoformat()
-        summary = {"names": [s["name"] for s in export["services"]], "templateId": template_id}
+        summary = {"names": [s["name"] for s in export["services"]], "templateId": export["services"][0]["serviceTypeId"],
+                   "tags": [tag["name"] for tag in export["tags"].values()]}
         with self._connect() as db:
             db.execute("INSERT INTO packages VALUES (?, ?, ?, ?, ?)", (package_id, identifier, created, json.dumps(summary), json.dumps(export)))
         return {"id": package_id, "createdAt": created, **summary}

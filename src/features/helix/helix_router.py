@@ -28,8 +28,12 @@ class EnvironmentUpload(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
-class GenerateRequest(BaseModel):
-    templateId: str = Field(min_length=1, max_length=100)
+class CreateServiceRequest(BaseModel):
+    templateId: str | None = Field(default=None, min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    fieldValues: dict[str, str] = Field(default_factory=dict)
+    categoryIds: list[str] = Field(default_factory=list, max_length=100)
+    tags: list[str] = Field(default_factory=list, max_length=50)
 
 
 @Controller("/helix")
@@ -62,9 +66,9 @@ class HelixRouter:
     async def environment(self, environment_id: UUID) -> dict:
         return await asyncio.to_thread(self.service.get_environment, str(environment_id))
 
-    @Post("/api/environments/{environment_id}/generate")
-    async def generate(self, environment_id: UUID, body: GenerateRequest) -> dict:
-        return await asyncio.to_thread(self.service.generate, str(environment_id), body.templateId)
+    @Post("/api/environments/{environment_id}/services")
+    async def create(self, environment_id: UUID, body: CreateServiceRequest) -> dict:
+        return await asyncio.to_thread(self.service.create, str(environment_id), body.templateId, body.name, body.fieldValues, body.categoryIds, body.tags)
 
     @Get("/api/environments/{environment_id}/packages/{package_id}")
     async def download(self, environment_id: UUID, package_id: UUID, format: str = "json") -> Response:
@@ -78,4 +82,4 @@ class HelixRouter:
                 archive.writestr("ServiceExport.json", content)
             content = buffer.getvalue()
         return Response(content, media_type="application/zip" if format == "zip" else "application/json",
-                        headers={"Content-Disposition": f'attachment; filename="ServiceExport-dummy.{format}"'})
+                        headers={"Content-Disposition": f'attachment; filename="ServiceExport.{format}"'})

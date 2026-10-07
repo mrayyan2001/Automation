@@ -1,7 +1,8 @@
-"""Build isolated dummy service packages from an environment's export definitions."""
+"""Build service packages from an environment's export definitions."""
 
 from copy import deepcopy
 from datetime import datetime, timezone
+from html import escape
 import json
 from uuid import uuid4
 
@@ -14,6 +15,11 @@ def inspect_export(data: dict) -> dict:
             raise ValueError(f"The ServiceExport needs a {key} object.")
     if not isinstance(data.get("services", []), list):
         raise ValueError("services must be an array; an empty array is supported.")
+    if not isinstance(data.get("tags", {}), dict) or any(
+        not isinstance(tag, dict) or not isinstance(tag.get("name"), str)
+        for tag in data.get("tags", {}).values()
+    ):
+        raise ValueError("tags must be an object containing tag names.")
     templates = []
     for key, value in data["serviceTypes"].items():
         if not isinstance(value, dict) or not isinstance(value.get("fields"), list):
@@ -31,7 +37,8 @@ def inspect_export(data: dict) -> dict:
                 raise ValueError("Template field names and titles must be text.")
             if field.get("required"):
                 required.append({k: field.get(k) for k in ("id", "name", "title", "type")})
-        templates.append({"id": key, "name": value.get("name", key), "required": required})
+        templates.append({"id": key, "name": value.get("name", key), "required": required,
+                          "fields": deepcopy(value["fields"]), "categoryIds": value.get("categories", [])})
     if not templates:
         raise ValueError("The export has no service templates. Include the template definitions.")
     version = data["versionInfo"].get("versionInfo", {})
@@ -75,15 +82,59 @@ def _workflow(name: str, now: int) -> dict:
     }
 
 
-def generate_services(data: dict, template_id: str) -> dict:
+def create_service(data: dict, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None) -> dict:
     info = inspect_export(data)
+    if template_id is None and len(info["templates"]) == 1:
+        template_id = info["templates"][0]["id"]
     template = next((t for t in info["templates"] if t["id"] == template_id), None)
     if template is None:
-        raise ValueError("Choose a template from this environment.")
+        raise ValueError("Choose a service template from this environment.")
+    name = name.strip()
+    if not name or len(name) > 200:
+        raise ValueError("Enter a service name (1–200 characters).")
+    fields = {f["id"]: f for f in template["fields"] if str(f.get("name", "")).casefold() != "platform" and str(f.get("title", "")).casefold() != "platform"}
+    if set(field_values) - set(fields):
+        raise ValueError("A profile field does not belong to this environment's template.")
     text_types = {"MULTILINE_INPUT", "RICH_INPUT", "TEXT_INPUT", "SINGLELINE_INPUT"}
-    unsupported = [f["title"] or f["name"] for f in template["required"] if f["type"] not in text_types]
-    if unsupported:
-        raise ValueError("Dummy generation only supports required text fields. This template also requires: " + ", ".join(map(str, unsupported)))
+    values = {}
+    for field_id, field in fields.items():
+        value = field_values.get(field_id, "")
+        title = field.get("title") or field.get("name") or field_id
+        if not isinstance(value, str) or len(value) > 20000:
+            raise ValueError(f"{title} must be text with at most 20,000 characters.")
+        value = value.strip()
+        if field.get("required") and not value:
+            raise ValueError(f"{title} is required.")
+        if not value:
+            continue
+        if field["type"] == "DROPDOWN":
+            options = {o.get("name") for o in field.get("params", {}).get("form_values", []) if isinstance(o, dict)}
+            if value not in options:
+                raise ValueError(f"Choose a valid option for {title}.")
+        elif field["type"] not in text_types:
+            raise ValueError(f"{title} cannot be configured in this form yet.")
+        values[field_id] = "<p>" + escape(value).replace("\n", "<br>") + "</p>" if field["type"] == "RICH_INPUT" else value
+    allowed_categories = set(template["categoryIds"]) & set(data["categories"])
+    if set(category_ids) - allowed_categories:
+        raise ValueError("Choose categories available to this environment's template.")
+    selected_tags = {}
+    available_tags = data.get("tags", {})
+    for tag in tags or []:
+        if not isinstance(tag, str) or not tag.strip() or len(tag.strip()) > 100:
+            raise ValueError("Each tag must contain 1–100 characters.")
+        tag = tag.strip()
+        if tag.casefold() in {t["name"].casefold() for t in selected_tags.values()}:
+            continue
+        existing = next(((key, value) for key, value in available_tags.items()
+                         if isinstance(value, dict) and isinstance(value.get("name"), str)
+                         and value["name"].casefold() == tag.casefold() and value.get("locale") is None), None)
+        if existing:
+            selected_tags[existing[0]] = deepcopy(existing[1])
+        else:
+            identifier = _identity()["id"]
+            while identifier in available_tags or identifier in selected_tags:
+                identifier = _identity()["id"]
+            selected_tags[identifier] = {"name": tag, "locale": None}
     # Preserve environment definitions, but never copy existing service content or dependencies.
     output = deepcopy(data)
     preserve = {"versionInfo", "tenantConfig", "serviceTypes", "categories", "documentTypes", "showDisabledServiceQuantities"}
@@ -102,47 +153,49 @@ def generate_services(data: dict, template_id: str) -> dict:
         output[key] = {}
     output.setdefault("documentTypes", {})
     output.setdefault("showDisabledServiceQuantities", False)
+    output["tags"] = selected_tags
     token = uuid4().hex[:8]
     now = int(datetime.now(timezone.utc).timestamp() * 1000)
-    for index, label in enumerate(("Access Request", "Equipment Request", "General Assistance"), 1):
-        name = f"Demo {label} {token}"
-        workflow = _workflow(f"myit-sb:Demo Workflow {token} {index}", now)
-        revision = {
-            **_identity(), "name": name, "modifiedDate": now, "state": "draft", "workflowId": workflow["guid"],
-            "fulfillmentType": "INTERNAL_WORKFLOW", "fulfillmentExternalEmbeddedSupported": False,
-            "prices": [{**_identity(), "createDate": None, "modifiedDate": now, "summary": None,
-                        "paymentType": "FREE", "price": None, "currency": None, "paymentSchedule": None,
-                        "useBundledServicesCosts": False, "freeLabelId": None, "freeLabel": None}],
-            "fieldValues": [], "revisionTags": [], "tags": [], "documents": [], "allMappedCategories": [],
-            "media": [], "categoryIds": [], "multiRequestBundle": False, "minQuantity": 1, "maxQuantity": 100,
-            "enableBundleServiceLevelQuantity": False, "enableQuantity": False, "unavailableRequiredServicesCount": 0,
-            "hasDuplicates": False, "hasBundledDependentService": False,
-        }
-        for field in template["required"]:
-            text = f"A dummy {label.lower()} service." if field["name"] == "service_excerpt" else f"Demo {label.lower()}. The workflow starts and ends without additional actions."
-            revision["fieldValues"].append({**_identity(), "modifiedDate": now, "serviceTypeFieldId": field["id"],
-                                             "value": [f"<p>{text}</p>" if field["type"] == "RICH_INPUT" else text]})
-        service_identity = _identity()
-        version = {
-            **_identity(), "id": service_identity["id"], "revisions": [revision], "name": "", "state": "draft",
-            "reopenWorkflowEditEnabled": False, "available": True, "quickRequest": True,
-            "importedFromITSM": False, "autoDependent": False, "surveyEnabled": True, "ratingCount": 0,
-            "categories": [], "dynamicFields": [], "bundledServices": [], "media": [], "multiRequestBundle": False,
-            "score": 0, "bulkRequestedForUserLimit": 1, "unavailableRequiredServicesCount": 0, "translations": [],
-            "allowCollaboratorDelegation": False, "allowRequestOnlyForSubmitter": False, "calculatedAvailability": True,
-            "anyRevisionMetadataImport": False, "modified": True, "isDependent": False,
-        }
-        service = {
-            **service_identity, "versions": [version], "serviceType": None, "translations": [], "name": name,
-            "createDate": None, "modifiedDate": now, "summary": None, "state": "draft", "serviceTypeId": template_id,
-            "externalId": None, "catalogId": None, "isAction": False, "subCatalogId": None,
-            "allRevisions": [deepcopy(revision)], "modified": False,
-        }
-        output["services"].append(service)
-        output["selectedServiceIds"].append(service["id"])
-        output["processDefinitionGuidToProcessDefinition"][workflow["guid"]] = workflow
-        output["processDefinitionNameToProcessDefinitionGuid"][workflow["name"]] = workflow["guid"]
-        output["processGuidToSubCatalogName"][workflow["guid"]] = None
-        for key, obj in (("serviceTranslations", service), ("serviceVersionTranslations", version), ("serviceRevisionTranslations", revision)):
-            output[key][obj["guid"]] = []
+    workflow = _workflow(f"myit-sb:Service Workflow {token}", now)
+    revision = {
+        **_identity(), "name": name, "modifiedDate": now, "state": "draft", "workflowId": workflow["guid"],
+        "fulfillmentType": "INTERNAL_WORKFLOW", "fulfillmentExternalEmbeddedSupported": False,
+        "prices": [{**_identity(), "createDate": None, "modifiedDate": now, "summary": None,
+                    "paymentType": "FREE", "price": None, "currency": None, "paymentSchedule": None,
+                    "useBundledServicesCosts": False, "freeLabelId": None, "freeLabel": None}],
+        "fieldValues": [], "revisionTags": [], "tags": [], "documents": [], "allMappedCategories": [],
+        "media": [], "categoryIds": list(dict.fromkeys(category_ids)), "multiRequestBundle": False, "minQuantity": 1, "maxQuantity": 100,
+        "enableBundleServiceLevelQuantity": False, "enableQuantity": False, "unavailableRequiredServicesCount": 0,
+        "hasDuplicates": False, "hasBundledDependentService": False,
+    }
+    for field_id, value in values.items():
+        revision["fieldValues"].append({**_identity(), "modifiedDate": now, "serviceTypeFieldId": field_id, "value": [value]})
+    revision["revisionTags"] = [
+        {**_identity(), "createDate": now, "modifiedDate": now, "summary": "SbeServiceRevisionTag",
+         "tagId": tag_id, "locale": tag["locale"]}
+        for tag_id, tag in selected_tags.items()
+    ]
+    service_identity = _identity()
+    version = {
+        **_identity(), "id": service_identity["id"], "revisions": [revision], "name": "", "state": "draft",
+        "reopenWorkflowEditEnabled": False, "available": True, "quickRequest": True,
+        "importedFromITSM": False, "autoDependent": False, "surveyEnabled": True, "ratingCount": 0,
+        "categories": [], "dynamicFields": [], "bundledServices": [], "media": [], "multiRequestBundle": False,
+        "score": 0, "bulkRequestedForUserLimit": 1, "unavailableRequiredServicesCount": 0, "translations": [],
+        "allowCollaboratorDelegation": False, "allowRequestOnlyForSubmitter": False, "calculatedAvailability": True,
+        "anyRevisionMetadataImport": False, "modified": True, "isDependent": False,
+    }
+    service = {
+        **service_identity, "versions": [version], "serviceType": None, "translations": [], "name": name,
+        "createDate": None, "modifiedDate": now, "summary": None, "state": "draft", "serviceTypeId": template_id,
+        "externalId": None, "catalogId": None, "isAction": False, "subCatalogId": None,
+        "allRevisions": [deepcopy(revision)], "modified": False,
+    }
+    output["services"].append(service)
+    output["selectedServiceIds"].append(service["id"])
+    output["processDefinitionGuidToProcessDefinition"][workflow["guid"]] = workflow
+    output["processDefinitionNameToProcessDefinitionGuid"][workflow["name"]] = workflow["guid"]
+    output["processGuidToSubCatalogName"][workflow["guid"]] = None
+    for key, obj in (("serviceTranslations", service), ("serviceVersionTranslations", version), ("serviceRevisionTranslations", revision)):
+        output[key][obj["guid"]] = []
     return output

@@ -36,11 +36,11 @@ Content-Type: application/json
 
 GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}
 
-### Generate three dummy services
-POST http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/generate
+### Create a service
+POST http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/services
 Content-Type: application/json
 
-{"templateId": "1"}
+{"templateId": "1", "name": "Laptop Request", "fieldValues": {"1": "Request a laptop", "2": "Request a laptop for your work."}, "categoryIds": [], "tags": ["t1", "t2"]}
 
 ### Download JSON
 GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages/{{package_id}}
