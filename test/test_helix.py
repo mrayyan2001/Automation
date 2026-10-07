@@ -1,11 +1,13 @@
 """Exercise the environment workflow through the application's controller layer."""
 
 import io
+import asyncio
 import json
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import httpx
@@ -16,6 +18,27 @@ from common.exception.global_exception_handler import http_exception_handler
 from context import ApplicationContext
 from features.helix.helix_router import HelixRouter
 from features.helix.helix_service import HelixService
+from features.helix.service_generator import category_hierarchy, create_service
+from features.helix.helix_excel import excel_spec
+from openpyxl import load_workbook
+
+class CategoryHierarchyTest(unittest.TestCase):
+    def test_parent_links_group_categories_independent_of_order(self):
+        categories = {
+            "3": {"name": "Laptop", "parentId": 2},
+            "5": {"name": "Accounts", "parentId": "1"},
+            "2": {"name": "Hardware", "parentId": "1"},
+            "1": {"name": "IT", "parentId": None},
+            "4": {"name": "Monitor", "parentId": "2"},
+            "6": {"name": "Other", "parentId": "missing"},
+        }
+        hierarchy = category_hierarchy(categories)
+        self.assertEqual([c["id"] for c in hierarchy], ["1", "5", "2", "3", "4", "6"])
+        laptop = next(c for c in hierarchy if c["id"] == "3")
+        self.assertEqual(laptop["path"], "IT / Hardware / Laptop")
+        self.assertEqual(laptop["parentPath"], "IT / Hardware")
+        self.assertEqual(len(category_hierarchy({"1": {"name": "A", "parentId": "2"}, "2": {"name": "B", "parentId": "1"}})), 2)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -101,6 +124,30 @@ class HelixTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.service.get_environment(environment["id"])["packages"], [])
         self.assertEqual((await self.client.get("/helix/")).status_code, 200)
 
+    async def test_parent_category_can_be_selected_and_exported(self):
+        source = json.loads((ROOT / "reference" / "ServiceExport 3.json").read_text())
+        source["categories"] = {
+            "parent": {"name": "IT", "parentId": None},
+            "child": {"name": "Hardware", "parentId": "parent"},
+            "other": {"name": "Unrelated", "parentId": None},
+        }
+        for template in source["serviceTypes"].values():
+            template["categories"] = ["child"]
+        environment = self.service.save_environment("Parent categories", source)
+        template = environment["templates"][0]
+        self.assertEqual(template["categoryIds"], ["parent", "child"])
+        spec = excel_spec(source)
+        self.assertIn(["parent", "IT"], spec["categories"])
+        values = {field["id"]: "Profile text" for field in template["required"]}
+        response = await self.client.post(f"/helix/api/environments/{environment['id']}/services", json={
+            "name": "Parent service", "templateId": template["id"], "fieldValues": values, "categoryIds": ["parent"]})
+        self.assertEqual(response.status_code, 200, response.text)
+        export = self.service.get_package(environment["id"], response.json()["data"]["id"])
+        self.assertEqual(export["services"][0]["allRevisions"][0]["categoryIds"], ["parent"])
+        self.assertEqual(export["serviceTypes"], source["serviceTypes"])
+        with self.assertRaises(ValueError):
+            create_service(source, template["id"], "Invalid", values, ["other"])
+
     async def test_form_fields_categories_and_validation(self):
         source = json.loads((ROOT / "reference" / "ServiceExport 3.json").read_text())
         environment = self.service.save_environment("IT Request", source)
@@ -175,6 +222,71 @@ class HelixTests(unittest.IsolatedAsyncioTestCase):
         with zipfile.ZipFile(io.BytesIO((await self.client.get(url + "?format=zip")).content)) as archive:
             self.assertEqual(json.loads(archive.read("ServiceExport.json")), export)
         self.assertEqual(len(HelixService(self.database).get_environment(environment["id"])["packages"]), 1)
+
+    async def test_excel_template_import_and_package(self):
+        source = json.loads((ROOT / "reference" / "ServiceExport 3.json").read_text())
+        environment = self.service.save_environment("Excel environment", source)
+        base = f"/helix/api/environments/{environment['id']}"
+        # IDE/server processes may not have Node or any command on PATH.
+        with patch.dict("os.environ", {"PATH": "", "HELIX_SPREADSHEET_MODULES": "/missing/runtime"}):
+            download = await self.client.get(base + "/excel-template")
+        self.assertEqual(download.status_code, 200, download.text if download.status_code != 200 else "")
+        workbook = load_workbook(io.BytesIO(download.content))
+        self.assertEqual(workbook.sheetnames, ["Services"])
+        self.assertEqual(workbook["Services"].freeze_panes, "A2")
+        self.assertIn("ServicesTable", workbook["Services"].tables)
+        self.assertTrue(workbook["Services"].data_validations.dataValidation)
+        spec = excel_spec(source)
+        self.assertEqual([workbook["Services"].cell(1, c).value for c in range(1, len(spec["headers"]) + 1)], spec["headers"])
+        validations = workbook["Services"].data_validations.dataValidation
+        self.assertEqual({v.formula1 for v in validations}, {"ServiceTemplateOptions", "ServiceCategoryOptions"})
+        self.assertTrue(all(v.showDropDown is False for v in validations))
+        category_validation = next(v for v in validations if v.formula1 == "ServiceCategoryOptions")
+        self.assertEqual(str(category_validation.sqref), "C2:E51")
+        self.assertTrue(all(workbook["Services"].cell(row, column).fill.patternType is None for row in (1, 2) for column in range(1, len(spec["headers"]) + 1)))
+        self.assertTrue(workbook["Services"].column_dimensions["CX"].hidden)
+        self.assertTrue(workbook["Services"].column_dimensions["CY"].hidden)
+        workbook.close()
+
+        def file_with_rows(rows):
+            fixture = load_workbook(io.BytesIO(download.content))
+            for row, values in enumerate(rows, 2):
+                for column, value in enumerate(values, 1):
+                    fixture["Services"].cell(row, column, value)
+            output = io.BytesIO()
+            fixture.save(output)
+            fixture.close()
+            return output.getvalue()
+
+        valid = ["Laptop", "IT Request", "723", "326", "1", "t1,shared", "Laptop excerpt", "Laptop description"]
+        second = ["Monitor", "1", "1", "", "", "t2,shared", "Monitor excerpt", "Monitor description"]
+        contents = await asyncio.to_thread(file_with_rows, [valid, second])
+        imported = await self.client.post(base + "/import-excel", content=contents)
+        self.assertEqual(imported.status_code, 200, imported.text)
+        result = imported.json()["data"]
+        self.assertFalse(result["errors"])
+        self.assertEqual(len(result["services"]), 2)
+        self.assertEqual(result["services"][0]["categoryIds"], ["723", "326", "1"])
+        self.assertEqual(self.service.get_environment(environment["id"])["packages"], [])
+        saved = await self.client.post(base + "/packages", json={"services": result["services"]})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        export = self.service.get_package(environment["id"], saved.json()["data"]["id"])
+        self.assertEqual([s["name"] for s in export["services"]], ["Laptop", "Monitor"])
+
+        too_many = ["Too many categories", "IT Request", "723;326", "1", "4", "", "Excerpt", "Description"]
+        overflow = await self.client.post(base + "/import-excel", content=await asyncio.to_thread(file_with_rows, [too_many]))
+        self.assertEqual(overflow.status_code, 200)
+        self.assertFalse(overflow.json()["data"]["services"])
+        self.assertIn("3 categories", overflow.json()["data"]["errors"][0]["message"])
+        invalid = ["Broken", "IT Request", "", "", "", "", "", "Description"]
+        response = await self.client.post(base + "/import-excel", content=await asyncio.to_thread(file_with_rows, [valid, invalid]))
+        result = response.json()["data"]
+        self.assertFalse(result["services"])
+        self.assertEqual(result["errors"][0]["row"], 3)
+        self.assertIn("required", result["errors"][0]["message"])
+        self.assertEqual(len(self.service.get_environment(environment["id"])["packages"]), 1)
+        bad_file = await self.client.post(base + "/import-excel", content=b"not an xlsx")
+        self.assertEqual(bad_file.status_code, 400)
 
     async def test_environment_templates_and_no_platform(self):
         source = json.loads((ROOT / "reference" / "ServiceExport 2.json").read_text())

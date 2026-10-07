@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from common.annotation.router import Controller, Get, Post
 from features.helix.helix_service import HelixService
+from features.helix.helix_excel import build_excel_template, import_excel
 
 PAGE = Path(__file__).resolve().parents[3] / "pages" / "helix.html"
 MAX_UPLOAD = 5 * 1024 * 1024
@@ -32,7 +33,7 @@ class CreateServiceRequest(BaseModel):
     templateId: str | None = Field(default=None, min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=200)
     fieldValues: dict[str, str] = Field(default_factory=dict)
-    categoryIds: list[str] = Field(default_factory=list, max_length=100)
+    categoryIds: list[str] = Field(default_factory=list, max_length=3)
     tags: list[str] = Field(default_factory=list, max_length=50)
 
 
@@ -77,6 +78,31 @@ class HelixRouter:
     @Post("/api/environments/{environment_id}/packages")
     async def create_package(self, environment_id: UUID, body: CreatePackageRequest) -> dict:
         return await asyncio.to_thread(self.service.create_package, str(environment_id), [service.model_dump() for service in body.services])
+
+    @Get("/api/environments/{environment_id}/excel-template")
+    async def excel_template(self, environment_id: UUID) -> Response:
+        export = await asyncio.to_thread(self.service.get_export, str(environment_id))
+        try:
+            content = await asyncio.to_thread(build_excel_template, export)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(503, "Unable to generate the Excel template. Please try again.") from exc
+        return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": 'attachment; filename="Helix-services-template.xlsx"'})
+
+    @Post("/api/environments/{environment_id}/import-excel")
+    async def excel_import(self, environment_id: UUID, request: Request) -> dict:
+        export = await asyncio.to_thread(self.service.get_export, str(environment_id))
+        payload = bytearray()
+        async for chunk in request.stream():
+            payload.extend(chunk)
+            if len(payload) > MAX_UPLOAD:
+                raise HTTPException(413, "The Excel file must be smaller than 5 MB.")
+        try:
+            return await asyncio.to_thread(import_excel, export, bytes(payload))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @Get("/api/environments/{environment_id}/packages/{package_id}")
     async def download(self, environment_id: UUID, package_id: UUID, format: str = "json") -> Response:

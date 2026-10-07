@@ -38,7 +38,7 @@ def inspect_export(data: dict) -> dict:
             if field.get("required"):
                 required.append({k: field.get(k) for k in ("id", "name", "title", "type")})
         templates.append({"id": key, "name": value.get("name", key), "required": required,
-                          "fields": deepcopy(value["fields"]), "categoryIds": value.get("categories", [])})
+                          "fields": deepcopy(value["fields"]), "categoryIds": selectable_category_ids(data["categories"], value.get("categories", []))})
     if not templates:
         raise ValueError("The export has no service templates. Include the template definitions.")
     version = data["versionInfo"].get("versionInfo", {})
@@ -48,6 +48,42 @@ def inspect_export(data: dict) -> dict:
         "categoryCount": len(data["categories"]),
         "sourceServiceCount": len(data.get("services", [])),
     }
+
+
+def selectable_category_ids(categories: dict, assigned: list) -> list[str]:
+    """Include ancestors of template categories so parents can be selected directly."""
+    lookup = {str(key): value for key, value in categories.items()}
+    selected = set()
+    for identifier in assigned:
+        current = str(identifier)
+        seen = set()
+        while current in lookup and current not in seen:
+            seen.add(current)
+            selected.add(current)
+            parent = lookup[current].get("parentId")
+            current = str(parent) if parent is not None else None
+    return [category["id"] for category in category_hierarchy(categories) if category["id"] in selected]
+
+
+def category_hierarchy(categories: dict) -> list[dict]:
+    """Resolve parent links without depending on export order or parent ID type."""
+    lookup = {str(key): value for key, value in categories.items()}
+    result = []
+    for identifier, category in lookup.items():
+        names, seen, current = [], set(), identifier
+        while current in lookup and current not in seen:
+            seen.add(current)
+            item = lookup[current]
+            names.insert(0, item.get("name") or current)
+            parent = item.get("parentId")
+            current = str(parent) if parent is not None else None
+        result.append({"id": identifier, "name": category.get("name") or identifier,
+                       "parentId": category.get("parentId"), "path": " / ".join(names),
+                       "parentPath": " / ".join(names[:-1]), "_names": names})
+    result.sort(key=lambda item: tuple(name.casefold() for name in item["_names"]))
+    for item in result:
+        item.pop("_names")
+    return result
 
 
 def _identity() -> dict:
@@ -114,6 +150,8 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
         elif field["type"] not in text_types:
             raise ValueError(f"{title} cannot be configured in this form yet.")
         values[field_id] = "<p>" + escape(value).replace("\n", "<br>") + "</p>" if field["type"] == "RICH_INPUT" else value
+    if len(set(category_ids)) > 3:
+        raise ValueError("Choose at most 3 categories per service.")
     allowed_categories = set(template["categoryIds"]) & set(data["categories"])
     if set(category_ids) - allowed_categories:
         raise ValueError("Choose categories available to this environment's template.")
