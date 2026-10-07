@@ -138,6 +138,44 @@ class HelixTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(t["summary"] == "SbeServiceRevisionTag" and t["locale"] is None for t in revision["revisionTags"]))
         self.assertEqual(revision, package["services"][0]["versions"][0]["revisions"][0])
 
+    async def test_multi_service_package_and_atomic_validation(self):
+        source = json.loads((ROOT / "reference" / "ServiceExport 3.json").read_text())
+        desktop = json.loads((ROOT / "reference" / "ServiceExport 2.json").read_text())
+        source["serviceTypes"].update(desktop["serviceTypes"])
+        environment = self.service.save_environment("Mixed package", source)
+        endpoint = f"/helix/api/environments/{environment['id']}/packages"
+        services = [
+            {"name": "Laptop", "templateId": "1", "fieldValues": {"1": "Laptop excerpt", "2": "Laptop description"}, "tags": ["t1", "shared new tag"]},
+            {"name": "Desktop", "templateId": "2", "fieldValues": {"3": "Desktop excerpt", "5": "Desktop description"}, "tags": ["shared new tag", "t2"]},
+        ]
+        invalid = await self.client.post(endpoint, json={"services": [services[0], {**services[1], "fieldValues": {}}]})
+        self.assertEqual(invalid.status_code, 400)
+        duplicate = await self.client.post(endpoint, json={"services": [services[0], {**services[1], "name": " laptop "}]})
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(self.service.get_environment(environment["id"])["packages"], [])
+        response = await self.client.post(endpoint, json={"services": services})
+        self.assertEqual(response.status_code, 200, response.text)
+        summary = response.json()["data"]
+        self.assertEqual(summary["names"], ["Laptop", "Desktop"])
+        url = f"/helix/api/environments/{environment['id']}/packages/{summary['id']}"
+        export = (await self.client.get(url)).json()
+        self.assertEqual(len(export["services"]), 2)
+        self.assertEqual(len(set(export["selectedServiceIds"])), 2)
+        self.assertEqual(len(export["processDefinitionGuidToProcessDefinition"]), 2)
+        self.assertEqual(len(export["tags"]), 3)
+        shared_id = next(k for k, t in export["tags"].items() if t["name"] == "shared new tag")
+        for service, template_id in zip(export["services"], ["1", "2"]):
+            self.assertEqual(service["serviceTypeId"], template_id)
+            revision = service["allRevisions"][0]
+            self.assertEqual(revision, service["versions"][0]["revisions"][0])
+            self.assertIn(shared_id, {t["tagId"] for t in revision["revisionTags"]})
+            self.assertTrue(all(t["tagId"] in export["tags"] for t in revision["revisionTags"]))
+            self.assertIn(revision["workflowId"], export["processDefinitionGuidToProcessDefinition"])
+            self.assertIn(service["guid"], export["serviceTranslations"])
+        with zipfile.ZipFile(io.BytesIO((await self.client.get(url + "?format=zip")).content)) as archive:
+            self.assertEqual(json.loads(archive.read("ServiceExport.json")), export)
+        self.assertEqual(len(HelixService(self.database).get_environment(environment["id"])["packages"]), 1)
+
     async def test_environment_templates_and_no_platform(self):
         source = json.loads((ROOT / "reference" / "ServiceExport 2.json").read_text())
         environment = self.service.save_environment("Desktop only", source)

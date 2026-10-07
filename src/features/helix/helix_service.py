@@ -11,7 +11,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from common.annotation.service import Service
-from features.helix.service_generator import create_service, inspect_export
+from features.helix.service_generator import create_package, inspect_export
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -71,13 +71,17 @@ class HelixService:
                 "packages": [{"id": b["id"], "createdAt": b["created_at"], **json.loads(b["summary"])} for b in batches]}
 
     def create(self, identifier: str, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None) -> dict:
+        return self.create_package(identifier, [{"templateId": template_id, "name": name, "fieldValues": field_values,
+                                                "categoryIds": category_ids, "tags": tags or []}])
+
+    def create_package(self, identifier: str, services: list[dict]) -> dict:
         row = self._environment(identifier)
         try:
-            export = create_service(json.loads(row["export"]), template_id, name, field_values, category_ids, tags)
+            export = create_package(json.loads(row["export"]), services)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         package_id, created = str(uuid4()), datetime.now(timezone.utc).isoformat()
-        summary = {"names": [s["name"] for s in export["services"]], "templateId": export["services"][0]["serviceTypeId"],
+        summary = {"names": [s["name"] for s in export["services"]], "templateIds": list(dict.fromkeys(s["serviceTypeId"] for s in export["services"])),
                    "tags": [tag["name"] for tag in export["tags"].values()]}
         with self._connect() as db:
             db.execute("INSERT INTO packages VALUES (?, ?, ?, ?, ?)", (package_id, identifier, created, json.dumps(summary), json.dumps(export)))

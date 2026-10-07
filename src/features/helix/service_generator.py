@@ -199,3 +199,29 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
     for key, obj in (("serviceTranslations", service), ("serviceVersionTranslations", version), ("serviceRevisionTranslations", revision)):
         output[key][obj["guid"]] = []
     return output
+
+
+def create_package(data: dict, services: list[dict]) -> dict:
+    """Combine independently validated services, including shared tag references."""
+    if not 1 <= len(services) <= 50:
+        raise ValueError("A package must contain 1–50 services.")
+    names = [service["name"].strip().casefold() for service in services]
+    if len(set(names)) != len(names):
+        raise ValueError("Each service in a package must have a different name.")
+    package = None
+    source = deepcopy(data)
+    maps = ("processDefinitionGuidToProcessDefinition", "processDefinitionNameToProcessDefinitionGuid",
+            "processGuidToSubCatalogName", "serviceTranslations", "serviceVersionTranslations", "serviceRevisionTranslations", "tags")
+    for service in services:
+        export = create_service(source, service.get("templateId"), service["name"], service.get("fieldValues", {}),
+                                service.get("categoryIds", []), service.get("tags", []))
+        if package is None:
+            package = export
+        else:
+            package["services"].extend(export["services"])
+            package["selectedServiceIds"].extend(export["selectedServiceIds"])
+            for key in maps:
+                package[key].update(export[key])
+        # Subsequent services reuse newly created tags by name and ID.
+        source.setdefault("tags", {}).update(export["tags"])
+    return package

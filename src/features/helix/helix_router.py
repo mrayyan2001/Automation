@@ -36,6 +36,10 @@ class CreateServiceRequest(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=50)
 
 
+class CreatePackageRequest(BaseModel):
+    services: list[CreateServiceRequest] = Field(min_length=1, max_length=50)
+
+
 @Controller("/helix")
 class HelixRouter:
     def __init__(self, service: HelixService):
@@ -69,6 +73,10 @@ class HelixRouter:
     @Post("/api/environments/{environment_id}/services")
     async def create(self, environment_id: UUID, body: CreateServiceRequest) -> dict:
         return await asyncio.to_thread(self.service.create, str(environment_id), body.templateId, body.name, body.fieldValues, body.categoryIds, body.tags)
+
+    @Post("/api/environments/{environment_id}/packages")
+    async def create_package(self, environment_id: UUID, body: CreatePackageRequest) -> dict:
+        return await asyncio.to_thread(self.service.create_package, str(environment_id), [service.model_dump() for service in body.services])
 
     @Get("/api/environments/{environment_id}/packages/{package_id}")
     async def download(self, environment_id: UUID, package_id: UUID, format: str = "json") -> Response:

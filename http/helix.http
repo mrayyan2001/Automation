@@ -47,3 +47,13 @@ GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages/{{p
 
 ### Download ZIP
 GET http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages/{{package_id}}?format=zip
+
+
+### Create one package with multiple services
+POST http://127.0.0.1:8000/helix/api/environments/{{environment_id}}/packages
+Content-Type: application/json
+
+{"services": [
+  {"templateId": "1", "name": "Laptop Request", "fieldValues": {"1": "Request a laptop", "2": "Laptop description"}, "tags": ["equipment"]},
+  {"templateId": "1", "name": "Monitor Request", "fieldValues": {"1": "Request a monitor", "2": "Monitor description"}, "tags": ["equipment"]}
+]}
