@@ -121,11 +121,15 @@ def _controller_endpoint(controller_cls: type, method: Any) -> Any:
 
 
 def Controller(prefix: str, **router_kwargs: Any):
-    """Register ``@get`` methods on a controller as an application router."""
+    """Register controller routes with a readable tag derived from the module."""
 
     def decorator(cls: type) -> type:
         cls = controller_component(cls)
-        router = AppRouter(prefix=prefix.rstrip("/"), **router_kwargs)
+        module_name = cls.__module__.rsplit(".", 1)[-1]
+        tag = module_name.removesuffix("_router").removesuffix("_controller")
+        tag = tag.replace("_", " ").title()
+        kwargs = {"tags": [tag], **router_kwargs}
+        router = AppRouter(prefix=prefix.rstrip("/"), **kwargs)
 
         for method in vars(cls).values():
             route = getattr(method, "__route__", None)
