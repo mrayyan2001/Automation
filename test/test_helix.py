@@ -44,6 +44,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HelixTests(unittest.IsolatedAsyncioTestCase):
+    async def test_download_excel_sample_and_import(self):
+        source = json.loads((ROOT / 'reference' / 'Service with questions.json').read_text())
+        environment = self.service.save_environment('Excel sample', source)
+        base = f"/helix/api/environments/{environment['id']}"
+        response = await self.client.get(base + '/excel-sample')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn('Helix-services-sample.xlsx', response.headers['content-disposition'])
+        imported = await self.client.post(base + '/import-excel', content=response.content)
+        self.assertEqual(imported.status_code, 200, imported.text)
+        data = imported.json()['data']
+        self.assertEqual(data['errors'], [])
+        self.assertEqual(len(data['services'][0]['questions']), 18)
+        package = await self.client.post(base + '/packages', json={'services': data['services']})
+        self.assertEqual(package.status_code, 200, package.text)
+
     async def asyncSetUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.database = Path(self.directory.name) / "helix.sqlite3"
@@ -232,7 +247,7 @@ class HelixTests(unittest.IsolatedAsyncioTestCase):
             download = await self.client.get(base + "/excel-template")
         self.assertEqual(download.status_code, 200, download.text if download.status_code != 200 else "")
         workbook = load_workbook(io.BytesIO(download.content))
-        self.assertEqual(workbook.sheetnames, ["Services"])
+        self.assertEqual(workbook.sheetnames, ["Services", "Questions", "Choices", "Table rows", "Conditions", "Guide"])
         self.assertEqual(workbook["Services"].freeze_panes, "A2")
         self.assertIn("ServicesTable", workbook["Services"].tables)
         self.assertTrue(workbook["Services"].data_validations.dataValidation)

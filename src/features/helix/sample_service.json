@@ -1,0 +1,1089 @@
+{
+  "name": "Static question cases \u2014 test service",
+  "tags": [
+    "sample",
+    "testing"
+  ],
+  "questions": [
+    {
+      "id": "f2416fbb-aa00-ed4f-dbf7-555c3db93e21",
+      "type": "TextField",
+      "label": "textfieldQuestion",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": "<p>testDes</p>\n",
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": "test",
+        "maxLength": null,
+        "regex": null,
+        "regexCustomErrorMessage": null,
+        "regexErrorMessageType": "SystemDefault",
+        "formattingHint": null,
+        "taskTemplate": false,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "5e83f51a-45c6-44f4-fdc1-ca93a27620d8",
+      "type": "IntegerField",
+      "label": "Counter",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": null,
+        "minValue": -2147483648,
+        "maxValue": 2147483647,
+        "step": 1,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "2fe84d72-fd4d-1e36-4fae-ca98253165e8",
+      "type": "DescriptionWidget",
+      "label": "Service instructions",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": "<p>TEST</p>\n",
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "6eda8a9d-4c30-0e0b-2a3e-f78e5b1c41c3",
+      "type": "SectionWidget",
+      "label": "test",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "a2d2a8e9-f36a-bffb-671c-1c36709cc95b",
+      "type": "YesNo",
+      "label": "test",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "options": [
+          {
+            "dataValue": "true",
+            "displayValue": "YES",
+            "disabled": false
+          },
+          {
+            "dataValue": "false",
+            "displayValue": "NO",
+            "disabled": false
+          }
+        ],
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswer": "false",
+        "staticDataValues": [
+          "true",
+          "false"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "9e5cbf9e-6909-0d67-8377-e2b0afe2c755",
+      "type": "DateField",
+      "label": "Date",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": null,
+        "timezoneId": "Africa/Cairo",
+        "min": {
+          "limitType": "SPECIFIC",
+          "specificLimit": "2026-10-09"
+        },
+        "max": {
+          "limitType": "RELATIVE",
+          "relativeLimit": {
+            "questionId": null,
+            "dateUnit": "DAYS_FROM_NOW",
+            "numberOfUnits": 30,
+            "repeatableGroupInstanceId": null
+          }
+        },
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "9867cdae-aabc-a54f-ca24-2d589c676cd2",
+      "type": "RadioButtons",
+      "label": "StaticRadio",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": {
+          "leadingQuestionExpectedAnswers": [],
+          "expression": {
+            "operator": "NOT_EQUALS",
+            "withParentheses": false,
+            "left": {
+              "values": [],
+              "type": "QUESTION_ANSWER",
+              "label": "textfieldQuestion",
+              "valueReference": "f2416fbb-aa00-ed4f-dbf7-555c3db93e21",
+              "fieldType": null,
+              "value": null
+            },
+            "right": {
+              "values": [],
+              "type": "STRING",
+              "label": null,
+              "valueReference": null,
+              "fieldType": null,
+              "value": null
+            }
+          }
+        },
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "options": [
+          {
+            "dataValue": "Op1",
+            "displayValue": "op1",
+            "disabled": false
+          },
+          {
+            "dataValue": "Op2",
+            "displayValue": "Op2",
+            "disabled": false
+          }
+        ],
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswer": null,
+        "staticDataValues": [
+          "Op2",
+          "Op1"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "bcb708d7-62a5-8dc0-ab96-60443eb2e6fd",
+      "type": "DateTimeField",
+      "label": "Date and time",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": {
+          "leadingQuestionExpectedAnswers": [],
+          "expression": {
+            "operator": "AND",
+            "withParentheses": false,
+            "left": {
+              "operator": "NOT_EQUALS",
+              "withParentheses": false,
+              "left": {
+                "values": [],
+                "type": "QUESTION_ANSWER",
+                "label": "textfieldQuestion",
+                "valueReference": "f2416fbb-aa00-ed4f-dbf7-555c3db93e21",
+                "fieldType": null,
+                "value": null
+              },
+              "right": {
+                "values": [],
+                "type": "STRING",
+                "label": null,
+                "valueReference": null,
+                "fieldType": null,
+                "value": null
+              }
+            },
+            "right": {
+              "operator": "EQUALS",
+              "withParentheses": false,
+              "left": {
+                "values": [],
+                "type": "QUESTION_ANSWER",
+                "label": "StaticRadio",
+                "valueReference": "9867cdae-aabc-a54f-ca24-2d589c676cd2",
+                "fieldType": null,
+                "value": null
+              },
+              "right": {
+                "values": [
+                  "Op1"
+                ],
+                "type": "QUESTION_OPTION",
+                "label": "op1",
+                "valueReference": null,
+                "fieldType": null,
+                "value": "Op1"
+              }
+            }
+          }
+        },
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": null,
+        "zonedDefaultAnswer": null,
+        "timezoneId": "Africa/Cairo",
+        "min": {
+          "limitType": "RELATIVE",
+          "relativeLimit": {
+            "questionId": null,
+            "dateUnit": "DAYS_FROM_NOW",
+            "numberOfUnits": 1,
+            "repeatableGroupInstanceId": null
+          }
+        },
+        "max": {
+          "limitType": "NO_LIMIT"
+        },
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "1ea02e39-ed0c-5aca-b26d-f34fd38e671b",
+      "type": "MultiSelectDropdown",
+      "label": "StaticDropDown",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": {
+          "leadingQuestionExpectedAnswers": [],
+          "expression": {
+            "operator": "OR",
+            "withParentheses": false,
+            "left": {
+              "operator": "AND",
+              "withParentheses": false,
+              "left": {
+                "operator": "EQUALS",
+                "withParentheses": false,
+                "left": {
+                  "values": [],
+                  "type": "QUESTION_ANSWER",
+                  "label": "textfieldQuestion",
+                  "valueReference": "f2416fbb-aa00-ed4f-dbf7-555c3db93e21",
+                  "fieldType": null,
+                  "value": null
+                },
+                "right": {
+                  "values": [
+                    "test"
+                  ],
+                  "type": "STRING",
+                  "label": null,
+                  "valueReference": null,
+                  "fieldType": null,
+                  "value": "test"
+                }
+              },
+              "right": {
+                "operator": "EQUALS",
+                "withParentheses": false,
+                "left": {
+                  "values": [],
+                  "type": "QUESTION_ANSWER",
+                  "label": "StaticRadio",
+                  "valueReference": "9867cdae-aabc-a54f-ca24-2d589c676cd2",
+                  "fieldType": null,
+                  "value": null
+                },
+                "right": {
+                  "values": [
+                    "Op2"
+                  ],
+                  "type": "QUESTION_OPTION",
+                  "label": "Op2",
+                  "valueReference": null,
+                  "fieldType": null,
+                  "value": "Op2"
+                }
+              }
+            },
+            "right": {
+              "operator": "AND",
+              "withParentheses": true,
+              "left": {
+                "operator": "NOT_EQUALS",
+                "withParentheses": false,
+                "left": {
+                  "values": [],
+                  "type": "QUESTION_ANSWER",
+                  "label": "textfieldQuestion",
+                  "valueReference": "f2416fbb-aa00-ed4f-dbf7-555c3db93e21",
+                  "fieldType": null,
+                  "value": null
+                },
+                "right": {
+                  "values": [],
+                  "type": "STRING",
+                  "label": null,
+                  "valueReference": null,
+                  "fieldType": null,
+                  "value": null
+                }
+              },
+              "right": {
+                "operator": "STARTS_WITH",
+                "withParentheses": false,
+                "left": {
+                  "values": [],
+                  "type": "QUESTION_ANSWER",
+                  "label": "StaticRadio",
+                  "valueReference": "9867cdae-aabc-a54f-ca24-2d589c676cd2",
+                  "fieldType": null,
+                  "value": null
+                },
+                "right": {
+                  "values": [
+                    "Op1"
+                  ],
+                  "type": "QUESTION_OPTION",
+                  "label": "op1",
+                  "valueReference": null,
+                  "fieldType": null,
+                  "value": "Op1"
+                }
+              }
+            }
+          }
+        },
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "options": [
+          {
+            "dataValue": "v1",
+            "displayValue": "v1",
+            "disabled": false
+          },
+          {
+            "dataValue": "v2",
+            "displayValue": "v2",
+            "disabled": false
+          }
+        ],
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswers": [],
+        "staticDataValues": [
+          "v1",
+          "v2"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "025321bc-007c-891a-986a-6958f67b7d7f",
+      "type": "DataTable",
+      "label": "StaticTable",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "questionMultiColumn": {
+          "metaData": [
+            {
+              "displayId": "ca520bbf-6a43-b8fe-23bb-8a2452b8110a",
+              "displayName": "Column 1",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            },
+            {
+              "displayId": "a0ef26cf-e2b9-93a4-b236-a9409f223721",
+              "displayName": "Column 2",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            },
+            {
+              "displayId": "43c2754b-f76b-ce6b-c1f7-af61f2cd453b",
+              "displayName": "Column 3",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            },
+            {
+              "displayId": "5c675b75-4925-bb80-7f95-89ebb329b979",
+              "displayName": "Column 4",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            }
+          ],
+          "data": [
+            {
+              "dataValue": "0",
+              "displayValue": [
+                "val11",
+                "val12",
+                "val3",
+                "v14"
+              ]
+            },
+            {
+              "dataValue": "1",
+              "displayValue": [
+                "v21",
+                "v22",
+                "v23",
+                "v24"
+              ]
+            }
+          ]
+        },
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswer": null,
+        "staticDataValues": [
+          "0",
+          "1"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "48f077d9-874d-2e63-94cc-a75b57202258",
+      "type": "MultiSelectDataTable",
+      "label": "staticMultiSelectTable",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "questionMultiColumn": {
+          "metaData": [
+            {
+              "displayId": "2e9764ec-e8cd-25bc-b980-1cdb1426f267",
+              "displayName": "Column 1",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            },
+            {
+              "displayId": "696bb9fd-3cf9-2ac7-b924-2951c9c791f2",
+              "displayName": "Column 2",
+              "datasetFieldType": null,
+              "selectionItems": null,
+              "dataValueField": false
+            }
+          ],
+          "data": [
+            {
+              "dataValue": "v12",
+              "displayValue": [
+                "v12",
+                "v11"
+              ]
+            },
+            {
+              "dataValue": "v21",
+              "displayValue": [
+                "v21",
+                "v21"
+              ]
+            }
+          ]
+        },
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswers": [],
+        "staticDataValues": [
+          "v21",
+          "v12"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "a544317b-c547-16a7-d475-7bb85b534750",
+      "type": "TextArea",
+      "label": "TextAreaQ",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": "<p>testdes</p>\n",
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": null,
+        "formattingHint": null,
+        "maxLength": null,
+        "regex": null,
+        "regexCustomErrorMessage": null,
+        "regexErrorMessageType": "SystemDefault",
+        "numberOfRows": 254,
+        "enabledPasswordEncryption": false,
+        "confidential": false,
+        "isRTF": true
+      }
+    },
+    {
+      "id": "f062e13e-e4cf-6229-30cd-5c514445be94",
+      "type": "Checkbox",
+      "label": "StaticCheckbox",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "options": [
+          {
+            "dataValue": "v1",
+            "displayValue": "v1",
+            "disabled": false
+          },
+          {
+            "dataValue": "v2",
+            "displayValue": "v2",
+            "disabled": false
+          }
+        ],
+        "connectorId": null,
+        "datasetId": null,
+        "datasetName": null,
+        "datasetIdFieldId": null,
+        "datasetIdFieldName": null,
+        "datasetNameFieldId": null,
+        "datasetNameFieldName": null,
+        "qualification": null,
+        "qualificationExpression": null,
+        "useCustomQualification": false,
+        "runAsAdministrator": false,
+        "lookupByProcess": null,
+        "defaultAnswers": [],
+        "staticDataValues": [
+          "v1",
+          "v2"
+        ],
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "49198ce2-11ec-cc42-2434-f3b96c3ad233",
+      "type": "TextField",
+      "label": "hiddenQuestion",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": {
+          "leadingQuestionId": "f062e13e-e4cf-6229-30cd-5c514445be94",
+          "leadingQuestionExpectedAnswers": [
+            "v1"
+          ],
+          "expression": {
+            "operator": "INCLUDES",
+            "withParentheses": false,
+            "left": {
+              "values": [],
+              "type": "QUESTION_ANSWER",
+              "label": "StaticCheckbox",
+              "valueReference": "f062e13e-e4cf-6229-30cd-5c514445be94",
+              "fieldType": null,
+              "value": null
+            },
+            "right": {
+              "values": [
+                "v1"
+              ],
+              "type": "QUESTION_OPTION",
+              "label": "v1",
+              "valueReference": null,
+              "fieldType": null,
+              "value": "v1"
+            }
+          }
+        },
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": true,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": "test",
+        "maxLength": null,
+        "regex": null,
+        "regexCustomErrorMessage": null,
+        "regexErrorMessageType": "SystemDefault",
+        "formattingHint": null,
+        "taskTemplate": false,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "f03d4338-b18f-bed4-3f23-73978118bc3c",
+      "type": "TextField",
+      "label": "ReadOnlywithAction",
+      "required": false,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": {
+          "leadingQuestionId": "f062e13e-e4cf-6229-30cd-5c514445be94",
+          "leadingQuestionExpectedAnswers": [
+            "v1"
+          ],
+          "expression": {
+            "operator": "INCLUDES",
+            "withParentheses": false,
+            "left": {
+              "values": [],
+              "type": "QUESTION_ANSWER",
+              "label": "StaticCheckbox",
+              "valueReference": "f062e13e-e4cf-6229-30cd-5c514445be94",
+              "fieldType": null,
+              "value": null
+            },
+            "right": {
+              "values": [
+                "v1"
+              ],
+              "type": "QUESTION_OPTION",
+              "label": "v1",
+              "valueReference": null,
+              "fieldType": null,
+              "value": "v1"
+            }
+          }
+        },
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "storedValueType": null,
+        "hidden": false,
+        "readOnly": true,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationProcessGuid": null,
+        "processBasedValidationProcessName": null,
+        "processBasedValidationErrorMessage": null,
+        "processBasedValidationSuccessMessage": null,
+        "processBasedValidationProcessInput": null,
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "assignExpression": null,
+        "defaultAnswer": null,
+        "maxLength": null,
+        "regex": null,
+        "regexCustomErrorMessage": null,
+        "regexErrorMessageType": "SystemDefault",
+        "formattingHint": null,
+        "taskTemplate": false,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "0ea92ab0-59c5-86d1-0535-780bbfac9426",
+      "type": "Attachment",
+      "label": "AttachementQuestion",
+      "required": false,
+      "config": {
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "tags": [],
+        "hidden": false,
+        "readOnly": false,
+        "readOnlyAnswerModifiableViaApi": true,
+        "answerSource": "DEFAULT",
+        "processBasedValidationOnErrorMessage": "CustomMessage",
+        "processBasedValidationOnSuccessMessage": "NoMessage",
+        "defaultAnswers": [],
+        "globalFileLimitOverridden": false,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      }
+    },
+    {
+      "id": "f9509e98-37ac-3f14-f748-15d4110005a5",
+      "type": "RepeatableGroup",
+      "label": "Repeatable Group of Questions",
+      "required": true,
+      "config": {
+        "externalId": null,
+        "perUser": false,
+        "visible": true,
+        "useDefaultLocale": false,
+        "visibilityCondition": null,
+        "alias": null,
+        "description": null,
+        "tags": [],
+        "outputFormat": "CSV",
+        "instanceLimit": 5,
+        "enabledPasswordEncryption": false,
+        "confidential": false
+      },
+      "pageItems": [
+        {
+          "id": "fcd5bab7-7fa1-7646-b34e-8d4b2f497763",
+          "type": "TextField",
+          "label": "q1",
+          "required": false,
+          "config": {
+            "externalId": null,
+            "perUser": false,
+            "visible": true,
+            "useDefaultLocale": false,
+            "visibilityCondition": null,
+            "alias": null,
+            "description": null,
+            "tags": [],
+            "storedValueType": null,
+            "hidden": false,
+            "readOnly": false,
+            "readOnlyAnswerModifiableViaApi": true,
+            "answerSource": "DEFAULT",
+            "processBasedValidationProcessGuid": null,
+            "processBasedValidationProcessName": null,
+            "processBasedValidationErrorMessage": null,
+            "processBasedValidationSuccessMessage": null,
+            "processBasedValidationProcessInput": null,
+            "processBasedValidationOnErrorMessage": "CustomMessage",
+            "processBasedValidationOnSuccessMessage": "NoMessage",
+            "assignExpression": null,
+            "defaultAnswer": null,
+            "maxLength": null,
+            "regex": null,
+            "regexCustomErrorMessage": null,
+            "regexErrorMessageType": "SystemDefault",
+            "formattingHint": null,
+            "taskTemplate": false,
+            "enabledPasswordEncryption": false,
+            "confidential": false
+          }
+        },
+        {
+          "id": "bc7e26df-3a84-9105-1843-58aeee92fd7b",
+          "type": "TextField",
+          "label": "q2",
+          "required": false,
+          "config": {
+            "externalId": null,
+            "perUser": false,
+            "visible": true,
+            "useDefaultLocale": false,
+            "visibilityCondition": null,
+            "alias": null,
+            "description": null,
+            "tags": [],
+            "storedValueType": null,
+            "hidden": false,
+            "readOnly": false,
+            "readOnlyAnswerModifiableViaApi": true,
+            "answerSource": "DEFAULT",
+            "processBasedValidationProcessGuid": null,
+            "processBasedValidationProcessName": null,
+            "processBasedValidationErrorMessage": null,
+            "processBasedValidationSuccessMessage": null,
+            "processBasedValidationProcessInput": null,
+            "processBasedValidationOnErrorMessage": "CustomMessage",
+            "processBasedValidationOnSuccessMessage": "NoMessage",
+            "assignExpression": null,
+            "defaultAnswer": null,
+            "maxLength": null,
+            "regex": null,
+            "regexCustomErrorMessage": null,
+            "regexErrorMessageType": "SystemDefault",
+            "formattingHint": null,
+            "taskTemplate": false,
+            "enabledPasswordEncryption": false,
+            "confidential": false
+          }
+        }
+      ]
+    }
+  ],
+  "questionnaireActions": []
+}

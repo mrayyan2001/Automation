@@ -11,6 +11,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.workbook.defined_name import DefinedName
 
 from features.helix.service_generator import category_hierarchy, create_service, inspect_export
+from features.helix.excel_questions import add_question_sheets, import_question_sheets
 
 SUPPORTED = {"MULTILINE_INPUT", "RICH_INPUT", "TEXT_INPUT", "SINGLELINE_INPUT", "DROPDOWN"}
 
@@ -36,7 +37,7 @@ def excel_spec(data: dict) -> dict:
             "categories": categories, "tags": [t["name"] for t in data.get("tags", {}).values()]}
 
 
-def build_excel_template(data: dict) -> bytes:
+def build_excel_template(data: dict, sample: dict | None = None) -> bytes:
     """Generate the download entirely in Python, independent of the server PATH."""
     spec = excel_spec(data)
     workbook = Workbook()
@@ -84,6 +85,10 @@ def build_excel_template(data: dict) -> bytes:
     dropdown("ServiceTemplateOptions", [t["name"] for t in spec["templates"]], 102, "B2:B51")
     allowed_categories = {identifier for template in spec["templates"] for identifier in template["categoryIds"]}
     dropdown("ServiceCategoryOptions", [path for identifier, path in spec["categories"] if identifier in allowed_categories], 103, "C2:E51")
+    add_question_sheets(workbook)
+    if sample is not None:
+        from features.helix.excel_sample import fill_excel_sample
+        fill_excel_sample(workbook, spec, sample)
     output = io.BytesIO()
     workbook.save(output)
     workbook.close()
@@ -124,10 +129,10 @@ def import_excel(data: dict, contents: bytes) -> dict:
             if row_number > 1000 or any(c.value is not None for c in cells[100:]):
                 raise ValueError("Use at most 100 columns and 1,000 worksheet rows.")
             if any(c.value is not None for c in cells[len(headers):]):
-                errors.append({"row": row_number, "message": "A filled cell has no matching column header."})
+                errors.append({"sheet": "Services", "row": row_number, "message": "A filled cell has no matching column header."})
                 continue
             if any(c.data_type in ("f", "e") for c in cells):
-                errors.append({"row": row_number, "message": "Use plain values, not formulas or Excel errors."})
+                errors.append({"sheet": "Services", "row": row_number, "message": "Use plain values, not formulas or Excel errors."})
                 continue
             row = {h: str(c.value).strip() if c.value is not None else "" for h, c in zip(headers, cells)}
             try:
@@ -160,7 +165,15 @@ def import_excel(data: dict, contents: bytes) -> dict:
                 seen_names.add(service["name"].casefold())
                 services.append(service)
             except ValueError as exc:
-                errors.append({"row": row_number, "message": str(exc)})
+                errors.append({"sheet": "Services", "row": row_number, "message": str(exc)})
+        question_rows = import_question_sheets(workbook, services, errors)
+        for service in services:
+            try:
+                create_service(data, service["templateId"], service["name"], service["fieldValues"],
+                               service["categoryIds"], service["tags"], service.get("questions", []))
+            except ValueError as exc:
+                errors.append({"sheet": "Questions", "row": question_rows.get(service["name"].casefold(), 1),
+                               "message": f"{service['name']}: {exc}"})
         if len(services) > 50:
             raise ValueError("Import at most 50 services into one package.")
         if not services and not errors:

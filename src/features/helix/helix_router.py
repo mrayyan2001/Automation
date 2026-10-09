@@ -35,6 +35,8 @@ class CreateServiceRequest(BaseModel):
     fieldValues: dict[str, str] = Field(default_factory=dict)
     categoryIds: list[str] = Field(default_factory=list, max_length=3)
     tags: list[str] = Field(default_factory=list, max_length=50)
+    questions: list[dict] = Field(default_factory=list, max_length=100)
+    questionnaireActions: list[dict] = Field(default_factory=list, max_length=100)
 
 
 class CreatePackageRequest(BaseModel):
@@ -49,6 +51,10 @@ class HelixRouter:
     @Get("/")
     async def page(self) -> FileResponse:
         return FileResponse(PAGE, media_type="text/html")
+
+    @Get("/question-editor.js")
+    async def question_editor(self) -> FileResponse:
+        return FileResponse(PAGE.with_name("helix-question-editor.js"), media_type="text/javascript")
 
     @Get("/api/environments")
     async def environments(self) -> list[dict]:
@@ -71,9 +77,13 @@ class HelixRouter:
     async def environment(self, environment_id: UUID) -> dict:
         return await asyncio.to_thread(self.service.get_environment, str(environment_id))
 
+    @Get("/api/environments/{environment_id}/sample-service")
+    async def sample_service(self, environment_id: UUID) -> dict:
+        return await asyncio.to_thread(self.service.sample_service, str(environment_id))
+
     @Post("/api/environments/{environment_id}/services")
     async def create(self, environment_id: UUID, body: CreateServiceRequest) -> dict:
-        return await asyncio.to_thread(self.service.create, str(environment_id), body.templateId, body.name, body.fieldValues, body.categoryIds, body.tags)
+        return await asyncio.to_thread(self.service.create_package, str(environment_id), [body.model_dump()])
 
     @Post("/api/environments/{environment_id}/packages")
     async def create_package(self, environment_id: UUID, body: CreatePackageRequest) -> dict:
@@ -90,6 +100,19 @@ class HelixRouter:
             raise HTTPException(503, "Unable to generate the Excel template. Please try again.") from exc
         return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         headers={"Content-Disposition": 'attachment; filename="Helix-services-template.xlsx"'})
+
+    @Get("/api/environments/{environment_id}/excel-sample")
+    async def excel_sample(self, environment_id: UUID) -> Response:
+        export = await asyncio.to_thread(self.service.get_export, str(environment_id))
+        sample = await asyncio.to_thread(self.service.sample_service, str(environment_id))
+        try:
+            content = await asyncio.to_thread(build_excel_template, export, sample)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(503, "Unable to generate the Excel sample. Please try again.") from exc
+        return Response(content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": 'attachment; filename="Helix-services-sample.xlsx"'})
 
     @Post("/api/environments/{environment_id}/import-excel")
     async def excel_import(self, environment_id: UUID, request: Request) -> dict:

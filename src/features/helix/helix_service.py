@@ -73,9 +73,36 @@ class HelixService:
     def get_export(self, identifier: str) -> dict:
         return json.loads(self._environment(identifier)["export"])
 
-    def create(self, identifier: str, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None) -> dict:
+    def sample_service(self, identifier: str) -> dict:
+        """Fill the reusable reference sample using this environment's profile IDs."""
+        export = self.get_export(identifier)
+        sample = json.loads(Path(__file__).with_name("sample_service.json").read_text())
+        supported = {"MULTILINE_INPUT", "RICH_INPUT", "TEXT_INPUT", "SINGLELINE_INPUT", "DROPDOWN"}
+        template = next((t for t in inspect_export(export)["templates"]
+                         if all(not f.get("required") or f["type"] in supported
+                                or any(str(f.get(k, "")).casefold() == "platform" for k in ("name", "title"))
+                                for f in t["fields"])), None)
+        if template is None:
+            raise HTTPException(400, "This environment has no template supported by the sample service.")
+        sample["templateId"] = template["id"]
+        sample["fieldValues"] = {}
+        for field in template["fields"]:
+            if any(str(field.get(k, "")).casefold() == "platform" for k in ("name", "title")):
+                continue
+            if field["type"] == "DROPDOWN":
+                options = field.get("params", {}).get("form_values", [])
+                value = next((o["name"] for o in options if isinstance(o, dict) and o.get("name")), "")
+            elif field["type"] in supported:
+                value = "Sample " + (field.get("title") or field.get("name") or field["id"])
+            else:
+                continue
+            sample["fieldValues"][field["id"]] = value
+        sample["categoryIds"] = template["categoryIds"][:3]
+        return sample
+
+    def create(self, identifier: str, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None, questions: list[dict] | None = None) -> dict:
         return self.create_package(identifier, [{"templateId": template_id, "name": name, "fieldValues": field_values,
-                                                "categoryIds": category_ids, "tags": tags or []}])
+                                                "categoryIds": category_ids, "tags": tags or [], "questions": questions or []}])
 
     def create_package(self, identifier: str, services: list[dict]) -> dict:
         row = self._environment(identifier)
@@ -85,7 +112,8 @@ class HelixService:
             raise HTTPException(400, str(exc)) from exc
         package_id, created = str(uuid4()), datetime.now(timezone.utc).isoformat()
         summary = {"names": [s["name"] for s in export["services"]], "templateIds": list(dict.fromkeys(s["serviceTypeId"] for s in export["services"])),
-                   "tags": [tag["name"] for tag in export["tags"].values()]}
+                   "tags": [tag["name"] for tag in export["tags"].values()],
+                   "questionCounts": [len(s.get("questions", [])) for s in services]}
         with self._connect() as db:
             db.execute("INSERT INTO packages VALUES (?, ?, ?, ?, ?)", (package_id, identifier, created, json.dumps(summary), json.dumps(export)))
         return {"id": package_id, "createdAt": created, **summary}
