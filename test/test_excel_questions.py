@@ -8,7 +8,7 @@ from datetime import datetime
 from openpyxl import load_workbook
 
 from features.helix.helix_excel import build_excel_template, import_excel, excel_spec
-from features.helix.excel_questions import QUESTION_HEADERS, CHOICE_HEADERS, TABLE_HEADERS
+from features.helix.excel_questions import QUESTION_HEADERS, CHOICE_HEADERS, TABLE_HEADERS, LEGACY_SHEETS, SIMPLE_TYPES
 from features.helix.helix_service import HelixService
 from features.helix.excel_questions import QUESTION_TYPES
 import tempfile
@@ -19,6 +19,10 @@ class ExcelQuestionsTest(unittest.TestCase):
     def setUp(self):
         self.source = json.loads((Path(__file__).parents[1] / 'reference/Service with questions.json').read_text())
         self.workbook = load_workbook(io.BytesIO(build_excel_template(self.source)))
+        # Exercise compatibility with the previous multi-sheet format.
+        del self.workbook['Questions']
+        for name, headers in LEGACY_SHEETS.items():
+            self.workbook.create_sheet(name).append(headers)
         spec = excel_spec(self.source)
         template = spec['templates'][0]
         self.service_row = {'Service name': 'Excel service', 'Service template': template['name']}
@@ -129,42 +133,109 @@ class ExcelQuestionsTest(unittest.TestCase):
         self.assertEqual(config['min']['specificLimit'], '2026-10-09')
         self.assertEqual(config['max']['relativeLimit']['numberOfUnits'], 30)
 
-    def test_filled_sample_round_trip_preserves_static_data_and_compound_rules(self):
+    def test_simple_template_and_sample_round_trip(self):
         with tempfile.TemporaryDirectory() as directory:
             storage = HelixService(Path(directory) / 'helix.sqlite3')
             environment = storage.save_environment('Sample', self.source)
             sample = storage.sample_service(environment['id'])
-            result = import_excel(self.source, build_excel_template(self.source, sample))
+            contents = build_excel_template(self.source, sample)
+        workbook = load_workbook(io.BytesIO(contents))
+        self.assertEqual(workbook.sheetnames, ['Services', 'Questions', 'Guide'])
+        self.assertTrue(workbook['Services'].column_dimensions['B'].hidden)
+        self.assertEqual([c.value for c in workbook['Questions'][1][:len(QUESTION_HEADERS)]], QUESTION_HEADERS)
+        operation_list = next(v for v in workbook['Questions'].data_validations.dataValidation if str(v.sqref) == 'L2:L1001')
+        self.assertLess(len(operation_list.formula1), 256)
+        self.assertEqual(operation_list.formula1, 'ConditionOperations')
+        source = workbook.defined_names['ConditionOperations']
+        source_sheet, source_range = next(source.destinations)
+        values = [cell.value for row in workbook[source_sheet][source_range] for cell in row]
+        self.assertEqual(values, ['is', 'is not', 'contains', 'does not contain', 'starts with', 'ends with', 'includes', 'does not include'])
+        self.assertEqual(workbook['Questions']['DF2'].value, '(no value)')
+        value_list = next(v for v in workbook['Questions'].data_validations.dataValidation if str(v.sqref) == 'M2')
+        self.assertFalse(value_list.showErrorMessage)
+        self.assertFalse(value_list.showDropDown)
+        self.assertIn('COUNTIF', value_list.formula1)
+        self.assertIn('$DF$2:$HB$2', value_list.formula1)
+        workbook.close()
+        result = import_excel(self.source, contents)
         self.assertEqual(result['errors'], [])
         questions = result['services'][0]['questions']
-        self.assertEqual(len(questions), 18)
-        self.assertEqual({q['type'] for q in questions}, set(QUESTION_TYPES.values()))
-        lookup = {(q['type'], q['label']): q for q in questions}
+        self.assertEqual({q['type'] for q in questions}, set(SIMPLE_TYPES.values()))
+        for q in questions:
+            for option in q['config'].get('options', []):
+                self.assertEqual(option['dataValue'], option['displayValue'])
+                self.assertFalse(option['disabled'])
+        self.assertEqual(create_package(self.source, result['services'])['connectorIdToConnection'], {})
 
-        def expression_shape(expression):
-            if expression['operator'] in ('AND', 'OR'):
-                return (expression['operator'], expression['withParentheses'],
-                        expression_shape(expression['left']), expression_shape(expression['right']))
-            return (expression['operator'], expression['left']['label'], expression['right'])
+    def test_inline_choices_conditions_and_row_errors(self):
+        del self.workbook['Questions']
+        for name in ('Choices', 'Table rows', 'Conditions'):
+            del self.workbook[name]
+        self.workbook.create_sheet('Questions').append(QUESTION_HEADERS)
+        self.write('Questions', 2, {'Service name': 'Excel service', 'Label': 'Department', 'Type': 'Dropdown', 'Choices': 'HR\nIT'})
+        self.write('Questions', 3, {'Service name': 'Excel service', 'Label': 'Details', 'Type': 'Short text', 'Show if label': 'Department', 'Operation': 'is', 'Value': 'HR'})
+        result = import_excel(self.source, self.contents())
+        self.assertEqual(result['errors'], [])
+        questions = result['services'][0]['questions']
+        self.assertEqual(questions[1]['config']['visibilityCondition']['leadingQuestionId'], questions[0]['id'])
+        self.write('Questions', 2, {'Choices': 'HR\nHR'})
+        result = import_excel(self.source, self.contents())
+        self.assertEqual(result['services'], [])
+        self.assertTrue(any(e['sheet'] == 'Questions' and e['row'] == 2 for e in result['errors']))
 
-        for original in sample['questions']:
-            question = lookup[original['type'], original['label']]
-            config = question['config']
-            source_config = original['config']
-            if source_config.get('options'):
-                self.assertEqual(config['options'], source_config['options'])
-            if source_config.get('questionMultiColumn'):
-                original_table = source_config['questionMultiColumn']
-                table = config['questionMultiColumn']
-                self.assertEqual(table['data'], original_table['data'])
-                self.assertEqual([c['displayName'] for c in table['metaData']],
-                                 [c['displayName'] for c in original_table['metaData']])
-            if source_config.get('visibilityCondition'):
-                self.assertEqual(expression_shape(config['visibilityCondition']['expression']),
-                                 expression_shape(source_config['visibilityCondition']['expression']))
-            self.assertFalse(config.get('connectorId') or config.get('datasetId'))
-        exported = create_package(self.source, result['services'])
-        self.assertEqual(exported['connectorIdToConnection'], {})
+    def test_condition_operations_and_value_kinds_export(self):
+        from features.helix.excel_questions import TEXT_OPERATIONS, MULTI_OPERATIONS
+        del self.workbook['Questions']
+        for name in ('Choices', 'Table rows', 'Conditions'):
+            del self.workbook[name]
+        sheet = self.workbook.create_sheet('Questions')
+        sheet.append(QUESTION_HEADERS)
+        leaders = [('Text', 'Short text', ''), ('Single', 'Dropdown', 'One\nTwo'),
+                   ('Multi', 'Multiple choice dropdown', 'One\nTwo')]
+        for number, (label, kind, choices) in enumerate(leaders, 2):
+            self.write('Questions', number, {'Service name': 'Excel service', 'Label': label, 'Type': kind, 'Choices': choices})
+        number = 5
+        expected = {}
+        for leader, _, _ in leaders:
+            operations = MULTI_OPERATIONS if leader == 'Multi' else TEXT_OPERATIONS
+            for operation, operator in operations.items():
+                for value in ('(no value)', 'custom text', 'One'):
+                    label = f'Dependent {number}'
+                    self.write('Questions', number, {'Service name': 'Excel service', 'Label': label, 'Type': 'Short text',
+                               'Show if label': leader, 'Operation': operation, 'Value': value})
+                    expected[label] = (leader, operator, value)
+                    number += 1
+        result = import_excel(self.source, self.contents())
+        self.assertEqual(result['errors'], [])
+        export = create_package(self.source, result['services'])
+        items = json.loads(export['questionnaires'][0]['jsonRepresentation'])['pages'][0]['pageItems']
+        lookup = {q['label']: q for q in items}
+        for label, (leader, operator, value) in expected.items():
+            condition = lookup[label]['visibilityCondition']
+            expression = condition['expression']
+            self.assertEqual(expression['operator'], operator)
+            self.assertEqual(expression['left']['valueReference'], lookup[leader]['id'])
+            right = expression['right']
+            selected = value == 'One' and leader != 'Text'
+            self.assertEqual(right['type'], 'QUESTION_OPTION' if selected else 'STRING')
+            self.assertEqual(right['label'], 'One' if selected else None)
+            self.assertEqual(right['value'], None if value == '(no value)' else value)
+            self.assertEqual(right['values'], [] if value == '(no value)' else [value])
+        # Type restrictions use the leading question, not the dependent question.
+        self.write('Questions', 5, {'Show if label': 'Multi', 'Operation': 'contains'})
+        result = import_excel(self.source, self.contents())
+        self.assertEqual(result['services'], [])
+        self.assertTrue(any(e['row'] == 5 and 'includes' in e['message'] for e in result['errors']))
+
+    def test_reference_condition_null_and_choice_shapes(self):
+        reference = json.loads((Path(__file__).parents[1] / 'reference/Conditions.json').read_text())
+        items = json.loads(reference['questionnaires'][0]['jsonRepresentation'])['pages'][0]['pageItems']
+        null_right = items[1]['visibilityCondition']['expression']['left']['right']
+        self.assertEqual(null_right, {'values': [], 'type': 'STRING', 'label': None,
+                                    'valueReference': None, 'fieldType': None, 'value': None})
+        choice_right = items[3]['visibilityCondition']['expression']['right']
+        self.assertEqual(choice_right['type'], 'QUESTION_OPTION')
+        self.assertEqual(choice_right['values'], ['2'])
 
     def test_invalid_condition_tree_prevents_import(self):
         self.question(2, 'leader', 'Short text')

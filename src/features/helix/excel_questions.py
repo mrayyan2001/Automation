@@ -20,7 +20,7 @@ QUESTION_TYPES = {
 CHOICE_TYPES = {'YesNo', 'Dropdown', 'RadioButtons', 'Checkbox', 'MultiSelectDropdown'}
 TABLE_TYPES = {'DataTable', 'MultiSelectDataTable'}
 MULTI_TYPES = {'Checkbox', 'MultiSelectDropdown', 'MultiSelectDataTable', 'Attachment'}
-QUESTION_HEADERS = [
+LEGACY_QUESTION_HEADERS = [
     'Service name', 'Question key', 'Parent group key', 'Type', 'Label', 'Required',
     'Help text', 'Default answer', 'Hidden', 'Read-only', 'Maximum characters',
     'Minimum number', 'Maximum number', 'Number step', 'Text rows', 'Rich text',
@@ -32,8 +32,17 @@ CHOICE_HEADERS = ['Service name', 'Question key', 'Label', 'Saved value', 'Defau
 TABLE_HEADERS = ['Service name', 'Question key', 'Saved row value', 'Default'] + [f'Value {n}' for n in range(1, 21)]
 CONDITION_HEADERS = ['Service name', 'Question key', 'Rule key', 'Parent rule key', 'Match',
                      'Leading question key', 'Comparison', 'Expected answers', 'Group parentheses']
-SHEETS = {'Questions': QUESTION_HEADERS, 'Choices': CHOICE_HEADERS, 'Table rows': TABLE_HEADERS,
+LEGACY_SHEETS = {'Questions': LEGACY_QUESTION_HEADERS, 'Choices': CHOICE_HEADERS, 'Table rows': TABLE_HEADERS,
           'Conditions': CONDITION_HEADERS}
+
+QUESTION_HEADERS = ['Service name', 'Label', 'Type', 'Required', 'Default answer', 'Hidden', 'Read-only', 'Earliest date', 'Latest date', 'Choices', 'Show if label', 'Operation', 'Value']
+SHEETS = {'Questions': QUESTION_HEADERS}
+SIMPLE_TYPES = {label: kind for label, kind in QUESTION_TYPES.items() if kind not in TABLE_TYPES | {'RepeatableGroup'}}
+
+TEXT_OPERATIONS = {'is': 'EQUALS', 'is not': 'NOT_EQUALS', 'contains': 'CONTAINS',
+                   'does not contain': 'NOT_CONTAINS', 'starts with': 'STARTS_WITH', 'ends with': 'ENDS_WITH'}
+MULTI_OPERATIONS = {'includes': 'INCLUDES', 'does not include': 'NOT_INCLUDES'}
+PREVIOUS_QUESTION_HEADERS = QUESTION_HEADERS[:11] + ['Answer is']
 
 
 def add_question_sheets(workbook):
@@ -76,35 +85,44 @@ def add_question_sheets(workbook):
         sheet.add_data_validation(validation)
         validation.add(f'{column}2:{column}1001')
 
-    dropdown('Questions', 'D', list(QUESTION_TYPES), 'QuestionTypeOptions')
-    for index, column in enumerate(('F', 'I', 'J', 'P')):
+    dropdown('Questions', 'C', list(SIMPLE_TYPES), 'QuestionTypeOptions')
+    for index, column in enumerate(('D', 'F', 'G')):
         dropdown('Questions', column, ['Yes', 'No'], f'QuestionBooleanOptions{index}')
-    dropdown('Questions', 'S', ['CSV', 'JSON'], 'QuestionGroupOutputOptions')
-    dropdown('Questions', 'Z', ['Equals', 'Does not equal', 'Includes', 'Does not include', 'Starts with', 'Ends with'], 'QuestionComparisonOptions')
-    for column in ('E', 'F'):
-        dropdown('Choices', column, ['Yes', 'No'], f'ChoiceBooleanOptions{column}')
-    dropdown('Table rows', 'D', ['Yes', 'No'], 'TableDefaultOptions')
-    dropdown('Conditions', 'E', ['All', 'Any'], 'ConditionMatchOptions')
-    dropdown('Conditions', 'G', ['Equals', 'Does not equal', 'Includes', 'Does not include', 'Starts with', 'Ends with'], 'ConditionComparisonOptions')
-    dropdown('Conditions', 'I', ['Yes', 'No'], 'ConditionParenthesesOptions')
+    dropdown('Questions', 'L', list(TEXT_OPERATIONS) + list(MULTI_OPERATIONS), 'ConditionOperations')
+    sheet = workbook['Questions']
+    leader_row = 'MATCH($A2&CHAR(1)&$K2,INDEX($A$2:$A$1001&CHAR(1)&$B$2:$B$1001,0),0)'
+    # Per-row dropdown sources update when labels or choice lists are edited.
+    # Free text remains allowed; import resolves known labels to QUESTION_OPTION.
+    for row_number in range(2, 102):
+        sheet.cell(row_number, 110, '(no value)')
+        source = f'IFERROR(INDEX($J$2:$J$1001,{leader_row.replace("$A2", f"$A{row_number}").replace("$K2", f"$K{row_number}")}),"")'
+        sheet.cell(row_number, 108, f'={source}')
+        for option in range(1, 101):
+            choice_list = f'CHAR(10)&$DD{row_number}&CHAR(10)'
+            start = f'FIND(CHAR(1),SUBSTITUTE({choice_list},CHAR(10),CHAR(1),{option}))'
+            end = f'FIND(CHAR(1),SUBSTITUTE({choice_list},CHAR(10),CHAR(1),{option + 1}))'
+            sheet.cell(row_number, 110 + option, f'=IFERROR(TRIM(MID($DD{row_number},{start},{end}-{start}-1)),"")')
+        value_validation = DataValidation(type='list', formula1=f'OFFSET($DF${row_number},0,0,1,MAX(1,COUNTIF($DF${row_number}:$HB${row_number},"?*")))', allow_blank=True)
+        value_validation.showDropDown = False
+        value_validation.showErrorMessage = False
+        sheet.add_data_validation(value_validation)
+        value_validation.add(f'M{row_number}')
+    for column in range(108, 211):
+        sheet.column_dimensions[get_column_letter(column)].hidden = True
     guide = workbook.create_sheet('Guide')
     guide.sheet_view.showGridLines = False
     rows = [
         ['Sheet / field', 'How to fill it'],
-        ['Services', 'One service per row. Use the environment template and category dropdowns.'],
-        ['Questions', 'One question per row. Service name must match Services. Question keys are unique within each service, for example name, department, items. Row order is question order.'],
-        ['Type and label', 'Choose a type. The label also becomes the workflow input name. Labels must be unique within each service, including group questions.'],
-        ['Choices', 'One choice per row. Use the same service name and question key. Label is displayed; Saved value is passed to the workflow (blank uses Label). Default and Disabled use Yes/No.'],
-        ['Table columns', 'Enter column titles on separate lines in Questions (Alt+Enter). Up to 20 columns.'],
-        ['Table rows', 'One data row per row. Saved row value must be unique for that question. Value 1 matches the first table column, Value 2 the second, and so on. Default uses Yes/No.'],
-        ['Repeatable groups', 'Create a Repeatable group question. For child questions, enter its Question key in Parent group key. Children support their own choices and tables. Nested groups are not supported.'],
-        ['Default answer', 'For multiple selections, use one saved value per line. Choices/Table rows can mark defaults instead; use one method. Numbers must be whole numbers.'],
-        ['Earliest / Latest date', 'Leave blank for no limit; use YYYY-MM-DD or today+N / today-N for a relative limit. Date defaults use YYYY-MM-DD; date-time defaults use YYYY-MM-DDTHH:MM.'],
-        ['Visibility', 'For a single rule, use Show when question key, Comparison, and Expected answers on Questions. Use Conditions instead for compound rules; do not use both methods on the same question.'],
-        ['Conditions', 'One rule per row. Rule keys are unique per question. A group uses Match All/Any; its child rows use its Rule key as Parent rule key. Leave Parent rule key blank on the single root rule. Leaf rules use Leading question key, Comparison, and Expected answers (one value per line).'],
-        ['Optional settings', 'Leave unused fields blank. Required, Hidden, Read-only, Rich text, Default, and Disabled accept Yes/No.'],
-        ['Import', 'Upload the workbook, review and edit the imported services in the package draft, then save. Any invalid row prevents the entire import; errors identify the sheet and row.'],
-        ['Limits', 'Up to 50 services, 100 questions per service/group, and 1,000 input rows per sheet. Static data only. Keep column headers; old Services-only templates still work.'],
+        ['Services', 'One service per row. Service template is hidden and defaults to the first environment template. Unhide it to select another template.'],
+        ['Questions', 'One question per row. Service name must match Services. Labels must be unique within each service. Row order is question order.'],
+        ['Choices', 'Enter choice labels on separate lines (Alt+Enter) in the question row. Each label is also the saved value.'],
+        ['Default answer', 'Use a choice label, or one label per line for multiple selections. Numbers must be whole numbers.'],
+        ['Earliest / Latest date', 'Leave blank for no limit; use YYYY-MM-DD or today+N / today-N. Date defaults use YYYY-MM-DD; date-time defaults use YYYY-MM-DDTHH:MM.'],
+        ['Conditions', 'Use Show if label, Operation, and Value in the question row. The Operation dropdown lists all eight operations. Text and single choice: is, is not, contains, does not contain, starts with, ends with. Multi select: includes, does not include.'],
+        ['Condition value', 'Choose a referenced choice label, type free text, or select (no value). Blank Value also means no value when Show if label is filled. Blank condition fields mean always visible. Value dropdowns show the first 100 labels for the first 100 question rows; other labels can be typed.'],
+        ['Optional settings', 'Required, Hidden, and Read-only accept Yes/No. Leave unused fields blank.'],
+        ['Import', 'Upload the workbook and review the package draft. Invalid rows prevent the entire import; errors identify the sheet and row.'],
+        ['Limits', 'Up to 50 services, 100 questions per service, and 1,000 input rows per sheet. Keep headers unchanged.'],
     ]
     for row in rows:
         guide.append(row)
@@ -120,7 +138,7 @@ def add_question_sheets(workbook):
 def _rows(workbook, name, errors):
     if name not in workbook.sheetnames:
         return []
-    expected = SHEETS[name]
+    expected = LEGACY_SHEETS[name]
     rows = workbook[name].iter_rows(max_row=1002, max_col=101)
     headers = [str(c.value).strip() if c.value is not None else '' for c in next(rows)]
     while headers and not headers[-1]:
@@ -178,7 +196,7 @@ def _limit(value):
     return {'limitType': 'SPECIFIC', 'specificLimit': parsed.isoformat()}
 
 
-def import_question_sheets(workbook, services, errors):
+def _import_legacy_question_sheets(workbook, services, errors):
     """Attach validated question trees, resolving workbook keys to fresh IDs."""
     service_map = {s['name'].casefold(): s for s in services}
     questions, locations, parents, visibility = {}, {}, {}, {}
@@ -412,3 +430,89 @@ def import_conditions(workbook, questions, simple_visibility, errors):
             questions[key]['config']['visibilityCondition'] = {'leadingQuestionExpectedAnswers': [], 'expression': expression}
         except ValueError as exc:
             errors.append({'sheet': 'Conditions', 'row': number, 'message': str(exc)})
+
+
+def import_question_sheets(workbook, services, errors):
+    """Expand simple inline inputs for the shared Helix importer."""
+    if 'Questions' not in workbook.sheetnames:
+        return _import_legacy_question_sheets(workbook, services, errors)
+    headers = [c.value for c in next(workbook['Questions'].iter_rows(max_row=1, max_col=len(QUESTION_HEADERS)))]
+    previous = headers[:len(PREVIOUS_QUESTION_HEADERS)] == PREVIOUS_QUESTION_HEADERS
+    if headers != QUESTION_HEADERS and not previous:
+        return _import_legacy_question_sheets(workbook, services, errors)
+    input_headers = PREVIOUS_QUESTION_HEADERS if previous else QUESTION_HEADERS
+    from openpyxl import Workbook
+    expanded = Workbook()
+    del expanded[expanded.active.title]
+    for name, columns in LEGACY_SHEETS.items():
+        expanded.create_sheet(name).append(columns)
+    locations, conditions = {}, {}
+    for number, cells in enumerate(workbook['Questions'].iter_rows(min_row=2, max_row=1002, max_col=101), 2):
+        if all(c.value is None or str(c.value).strip() == '' for c in cells):
+            continue
+        try:
+            if number > 1001:
+                raise ValueError('Use at most 1,000 input rows per sheet.')
+            if any(c.data_type in ('f', 'e') for c in cells):
+                raise ValueError('Use plain values, not formulas or Excel errors.')
+            if any(c.value is not None for c in cells[len(input_headers):]):
+                raise ValueError('A filled cell has no matching column header.')
+            row = {h: (c.value.isoformat() if isinstance(c.value, (date, datetime)) else str(c.value).strip() if c.value is not None else '') for h, c in zip(input_headers, cells)}
+            if SIMPLE_TYPES.get(row['Type'], row['Type']) not in SIMPLE_TYPES.values():
+                raise ValueError('Choose a supported static question type.')
+            if previous:
+                row['Operation'] = 'is'
+                row['Value'] = row.pop('Answer is')
+            if not row['Show if label'] and (row['Value'] or (not previous and row['Operation'])):
+                raise ValueError('Enter Show if label for this condition.')
+            if row['Show if label']:
+                conditions[(row['Service name'].casefold(), row['Label'].casefold())] = (number, row['Show if label'].casefold(), row['Operation'].casefold(), row['Value'])
+            legacy = {**row, 'Question key': row['Label'].casefold()}
+            for col, title in enumerate(LEGACY_QUESTION_HEADERS, 1):
+                expanded['Questions'].cell(number, col, legacy.get(title, ''))
+            labels = _lines(row['Choices'])
+            if labels and SIMPLE_TYPES.get(row['Type'], row['Type']) not in CHOICE_TYPES:
+                raise ValueError('Choices are only available for choice questions.')
+            for label in labels:
+                expanded['Choices'].append([row['Service name'], row['Label'].casefold(), label, label, '', ''])
+                locations[expanded['Choices'].max_row] = number
+        except ValueError as exc:
+            errors.append({'sheet': 'Questions', 'row': number, 'message': str(exc)})
+    start = len(errors)
+    result = _import_legacy_question_sheets(expanded, services, errors)
+    for error in errors[start:]:
+        if error['sheet'] == 'Choices':
+            error['row'] = locations.get(error['row'], error['row'])
+            error['sheet'] = 'Questions'
+        error['message'] = error['message'].replace('Question key', 'Label').replace('Show when question key', 'Show if label').replace('on Choices', 'in Choices')
+    questions = {(service['name'].casefold(), q['label'].casefold()): q for service in services for q in service.get('questions', [])}
+    for key, (number, leader_label, operation, value) in conditions.items():
+        try:
+            q = questions.get(key)
+            if q is None:
+                continue
+            leader = questions.get((key[0], leader_label))
+            if leader is None or leader is q:
+                raise ValueError('Show if label must reference another question in this service.')
+            multi = leader['type'] in {'Checkbox', 'MultiSelectDropdown'}
+            if leader['type'] not in {'TextField', 'TextArea', 'YesNo', 'Dropdown', 'RadioButtons', 'Checkbox', 'MultiSelectDropdown'}:
+                raise ValueError('Conditions must reference a text or choice question.')
+            operations = MULTI_OPERATIONS if multi else TEXT_OPERATIONS
+            operation = operation or ('includes' if multi else 'is')
+            if operation not in operations:
+                raise ValueError('Supported operations for this question: ' + ', '.join(operations) + '.')
+            no_value = not value or value.casefold() == '(no value)'
+            options = leader['config'].get('options', [])
+            selected = next((o for o in options if o['displayValue'] == value), None)
+            expected = [] if no_value else [selected['dataValue'] if selected else value]
+            right = {'values': expected, 'type': 'QUESTION_OPTION' if selected else 'STRING',
+                     'label': selected['displayValue'] if selected else None, 'valueReference': None,
+                     'fieldType': None, 'value': expected[0] if expected else None}
+            q['config']['visibilityCondition'] = {'leadingQuestionId': leader['id'], 'leadingQuestionExpectedAnswers': expected,
+                'expression': {'operator': operations[operation], 'withParentheses': False,
+                    'left': {'values': [], 'type': 'QUESTION_ANSWER', 'label': leader['label'], 'valueReference': leader['id'], 'fieldType': None, 'value': None},
+                    'right': right}}
+        except ValueError as exc:
+            errors.append({'sheet': 'Questions', 'row': number, 'message': str(exc)})
+    expanded.close()
+    return result

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from openpyxl.styles import Alignment, Font
 
-from features.helix.excel_questions import QUESTION_TYPES, MULTI_TYPES, TABLE_TYPES, SHEETS
+from features.helix.excel_questions import SIMPLE_TYPES, MULTI_TYPES, SHEETS, TEXT_OPERATIONS, MULTI_OPERATIONS
 
 
 class _PlainText(HTMLParser):
@@ -62,21 +62,17 @@ def fill_excel_sample(workbook, spec, sample):
     write('Services', 2, service_row)
     workbook['Services'].row_dimensions[2].height = 45
 
-    flattened = []
-    def flatten(items, parent=None):
-        for q in items:
-            flattened.append((q, parent))
-            if q.get('pageItems'):
-                flatten(q['pageItems'], q['id'])
-    flatten(sample['questions'])
-    keys = {q['id']: f'q{index:02}' for index, (q, _) in enumerate(flattened, 1)}
-    type_names = {value: name for name, value in QUESTION_TYPES.items()}
-    comparisons = {'EQUALS': 'Equals', 'NOT_EQUALS': 'Does not equal', 'INCLUDES': 'Includes',
-                   'NOT_INCLUDES': 'Does not include', 'STARTS_WITH': 'Starts with', 'ENDS_WITH': 'Ends with'}
-    counters = {'Choices': 2, 'Table rows': 2, 'Conditions': 2}
-    def append(name, values):
-        write(name, counters[name], values)
-        counters[name] += 1
+    questions = [q for q in sample['questions'] if q['type'] in SIMPLE_TYPES.values()]
+    used_labels = set()
+    for q in questions:
+        original = q['label']
+        suffix = 2
+        while q['label'].casefold() in used_labels:
+            q['label'] = f'{original} ({suffix})'
+            suffix += 1
+        used_labels.add(q['label'].casefold())
+    labels = {q['id']: q['label'] for q in questions}
+    type_names = {value: name for name, value in SIMPLE_TYPES.items()}
 
     def limit(value):
         if not value or value.get('limitType') == 'NO_LIMIT':
@@ -85,64 +81,36 @@ def fill_excel_sample(workbook, spec, sample):
             return value['specificLimit']
         return f"today{value['relativeLimit']['numberOfUnits']:+d}"
 
-    for number, (q, parent) in enumerate(flattened, 2):
+    for number, q in enumerate(questions, 2):
         c = q.get('config', {})
-        owner = {'Service name': sample['name'], 'Question key': keys[q['id']]}
-        row = {**owner, 'Parent group key': keys[parent] if parent else '',
-               'Type': type_names[q['type']], 'Label': q['label'],
-               'Required': 'Yes' if q.get('required') else 'No', 'Help text': _text(c.get('description'))}
-        for header, setting in [('Hidden', 'hidden'), ('Read-only', 'readOnly'), ('Rich text', 'isRTF')]:
+        row = {'Service name': sample['name'], 'Label': q['label'], 'Type': type_names[q['type']],
+               'Required': 'Yes' if q.get('required') else 'No'}
+        for header, setting in [('Hidden', 'hidden'), ('Read-only', 'readOnly')]:
             if setting in c:
                 row[header] = 'Yes' if c[setting] else 'No'
-        for header, setting in [('Maximum characters', 'maxLength'), ('Minimum number', 'minValue'),
-                                ('Maximum number', 'maxValue'), ('Number step', 'step'), ('Text rows', 'numberOfRows'),
-                                ('Group limit', 'instanceLimit'), ('Group output', 'outputFormat'), ('Timezone', 'timezoneId'),
-                                ('Validation pattern', 'regex'), ('Validation message', 'regexCustomErrorMessage')]:
-            row[header] = c.get(setting)
+        options = c.get('options', [])
+        row['Choices'] = '\n'.join(o['displayValue'] for o in options)
+        values = {o['dataValue']: o['displayValue'] for o in options}
+        defaults = c.get('defaultAnswers', []) if q['type'] in MULTI_TYPES else [c['defaultAnswer']] if c.get('defaultAnswer') is not None else []
+        row['Default answer'] = '\n'.join(str(values.get(v, v)) for v in defaults)
         row['Earliest date'] = limit(c.get('min'))
         row['Latest date'] = limit(c.get('max'))
-        defaults = c.get('defaultAnswers', []) if q['type'] in MULTI_TYPES else [c['defaultAnswer']] if c.get('defaultAnswer') is not None else []
-        if not c.get('options') and q['type'] not in TABLE_TYPES:
-            row['Default answer'] = '\n'.join(str(v) for v in defaults)
-        for option in c.get('options', []):
-            append('Choices', {**owner, 'Label': option['displayValue'], 'Saved value': option['dataValue'],
-                               'Default': 'Yes' if option['dataValue'] in defaults else 'No',
-                               'Disabled': 'Yes' if option.get('disabled') else 'No'})
-        if q['type'] in TABLE_TYPES:
-            table = c['questionMultiColumn']
-            row['Table columns'] = '\n'.join(col['displayName'] for col in table['metaData'])
-            for data in table['data']:
-                append('Table rows', {**owner, 'Saved row value': data['dataValue'],
-                                     'Default': 'Yes' if data['dataValue'] in defaults else 'No',
-                                     **{f'Value {index}': value for index, value in enumerate(data['displayValue'], 1)}})
-            workbook['Questions'].row_dimensions[number].height = max(36, 16 * len(table['metaData']) + 8)
+        expression = (c.get('visibilityCondition') or {}).get('expression', {})
+        operations = {value: name for name, value in {**TEXT_OPERATIONS, **MULTI_OPERATIONS}.items()}
+        if expression.get('operator') in operations:
+            leader_id = expression['left']['valueReference']
+            if leader_id in labels:
+                leader = next(item for item in questions if item['id'] == leader_id)
+                mapping = {o['dataValue']: o['displayValue'] for o in leader.get('config', {}).get('options', [])}
+                expected = expression['right'].get('values') or [expression['right'].get('value')]
+                row['Show if label'] = labels[leader_id]
+                row['Operation'] = operations[expression['operator']]
+                row['Value'] = next((str(mapping.get(v, v)) for v in expected if v is not None), '(no value)')
         write('Questions', number, row)
-        condition = c.get('visibilityCondition')
-        if condition:
-            counter = [0]
-            def condition_rows(expression, parent_key=''):
-                counter[0] += 1
-                rule_key = f'r{counter[0]:02}'
-                values = {**owner, 'Rule key': rule_key, 'Parent rule key': parent_key,
-                          'Group parentheses': 'Yes' if expression.get('withParentheses') else 'No'}
-                if expression['operator'] in ('AND', 'OR'):
-                    values['Match'] = 'All' if expression['operator'] == 'AND' else 'Any'
-                    append('Conditions', values)
-                    condition_rows(expression['left'], rule_key)
-                    condition_rows(expression['right'], rule_key)
-                else:
-                    right = expression['right']
-                    expected = right.get('values') or ([right['value']] if right.get('value') is not None else [])
-                    values.update({'Leading question key': keys[expression['left']['valueReference']],
-                                   'Comparison': comparisons[expression['operator']],
-                                   'Expected answers': '\n'.join(str(v) for v in expected)})
-                    append('Conditions', values)
-            condition_rows(condition['expression'])
+        workbook['Questions'].row_dimensions[number].height = max(36, 16 * len(options) + 8)
     guide = workbook['Guide']
-    number = guide.max_row + 1
-    guide.cell(number, 1, 'Filled sample')
-    guide.cell(number, 2, 'The static reference cases are prefilled. The extra single-choice dropdown uses the reference checkbox values v1/v2. Import this workbook directly or edit its cells first. Original compound visibility rules are on Conditions; no connectors or dynamic lookups are used.')
-    for cell in guide[number]:
+    guide.append(['Filled sample', 'Supported question types are prefilled. Choices use their labels as saved values. Single visibility conditions are included; tables, repeatable groups, and compound rules are omitted.'])
+    guide.row_dimensions[guide.max_row].height = 70
+    for cell in guide[guide.max_row]:
         cell.font = Font(name='Arial', size=11)
         cell.alignment = Alignment(vertical='top', wrap_text=True)
-    guide.row_dimensions[number].height = 70

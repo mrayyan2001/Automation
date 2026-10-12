@@ -61,6 +61,7 @@ def build_excel_template(data: dict, sample: dict | None = None) -> bytes:
     table.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=False)
     sheet.add_table(table)
     sheet.freeze_panes = "A2"
+    sheet.column_dimensions["B"].hidden = True
 
     # Keep dropdown sources in hidden columns on the same sheet, outside the service table.
     def dropdown(name, options, source_column, target):
@@ -85,6 +86,9 @@ def build_excel_template(data: dict, sample: dict | None = None) -> bytes:
     dropdown("ServiceTemplateOptions", [t["name"] for t in spec["templates"]], 102, "B2:B51")
     allowed_categories = {identifier for template in spec["templates"] for identifier in template["categoryIds"]}
     dropdown("ServiceCategoryOptions", [path for identifier, path in spec["categories"] if identifier in allowed_categories], 103, "C2:E51")
+    if spec["templates"]:
+        for row in range(2, 52):
+            sheet.cell(row, 2, spec["templates"][0]["name"])
     add_question_sheets(workbook)
     if sample is not None:
         from features.helix.excel_sample import fill_excel_sample
@@ -124,7 +128,7 @@ def import_excel(data: dict, contents: bytes) -> dict:
             raise ValueError("Service name and Service template columns are required.")
         services, errors, seen_names = [], [], set()
         for row_number, cells in enumerate(rows, 2):
-            if all(c.value is None or str(c.value).strip() == "" for c in cells):
+            if all(c.value is None or str(c.value).strip() == "" for index, c in enumerate(cells) if index >= len(headers) or headers[index] != "Service template"):
                 continue
             if row_number > 1000 or any(c.value is not None for c in cells[100:]):
                 raise ValueError("Use at most 100 columns and 1,000 worksheet rows.")

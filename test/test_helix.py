@@ -55,7 +55,7 @@ class HelixTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(imported.status_code, 200, imported.text)
         data = imported.json()['data']
         self.assertEqual(data['errors'], [])
-        self.assertEqual(len(data['services'][0]['questions']), 18)
+        self.assertEqual(len(data['services'][0]['questions']), 15)
         package = await self.client.post(base + '/packages', json={'services': data['services']})
         self.assertEqual(package.status_code, 200, package.text)
 
