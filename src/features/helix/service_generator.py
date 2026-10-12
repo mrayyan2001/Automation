@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from features.helix.questions import build_questionnaire
 from features.helix.workflows import apply_workflow, workflow_dependencies
+from features.helix.fulfillment import add_connection_metadata
 
 
 def inspect_export(data: dict) -> dict:
@@ -199,7 +200,7 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
     now = int(datetime.now(timezone.utc).timestamp() * 1000)
     workflow = _workflow(f"myit-sb:Service Workflow {token}", now)
     questionnaire = build_questionnaire(questions or [], workflow, name, now)
-    apply_workflow(workflow, workflow_rows or [], now)
+    apply_workflow(workflow, workflow_rows or [], now, environment=data)
     if questionnaire and questionnaire_actions:
         representation = json.loads(questionnaire["jsonRepresentation"])
         representation["actions"] = deepcopy(questionnaire_actions)
@@ -268,6 +269,7 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
     output["processDefinitionGuidToProcessDefinition"][workflow["guid"]] = workflow
     output["processDefinitionNameToProcessDefinitionGuid"][workflow["name"]] = workflow["guid"]
     output["processGuidToSubCatalogName"][workflow["guid"]] = None
+    add_connection_metadata(output, data)
     for key, obj in (("serviceTranslations", service), ("serviceVersionTranslations", version), ("serviceRevisionTranslations", revision)):
         output[key][obj["guid"]] = []
     return output
@@ -284,7 +286,7 @@ def create_package(data: dict, services: list[dict]) -> dict:
     source = deepcopy(data)
     maps = ("processDefinitionGuidToProcessDefinition", "processDefinitionNameToProcessDefinitionGuid",
             "processGuidToSubCatalogName", "serviceTranslations", "serviceVersionTranslations", "serviceRevisionTranslations", "tags",
-            "oldGroupIdToQuestionnaireTranslations", "connectorIdToConnection")
+            "oldGroupIdToQuestionnaireTranslations", "connectorIdToConnection", "rxConnectionIdToConnectionId", "rcfConnectionIdToConnectionId")
     for service in services:
         export = create_service(source, service.get("templateId"), service["name"], service.get("fieldValues", {}),
                                 service.get("categoryIds", []), service.get("tags", []), service.get("questions", []), service.get("questionnaireActions", []), service.get("workflow", []))

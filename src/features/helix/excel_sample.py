@@ -31,7 +31,7 @@ def _text(value):
     return ''.join(parser.parts).strip()
 
 
-def fill_excel_sample(workbook, spec, sample):
+def fill_excel_sample(workbook, spec, sample, environment=None):
     sample = deepcopy(sample)
     # The reference contains a dynamic-only single dropdown. Use its static
     # checkbox choices for a connector-free example of that supported type.
@@ -109,10 +109,10 @@ def fill_excel_sample(workbook, spec, sample):
         write('Questions', number, row)
         workbook['Questions'].row_dimensions[number].height = max(36, 16 * len(options) + 8)
     from features.helix.workflows import fill_workflow_sample
-    fill_workflow_sample(workbook, sample['name'])
+    fill_workflow_sample(workbook, sample['name'], environment)
     guide = workbook['Guide']
-    guide.append(['Filled sample', 'Supported question types are prefilled. Choices use their labels as saved values. Single visibility conditions are included; tables, repeatable groups, and compound rules are omitted.'])
-    guide.row_dimensions[guide.max_row].height = 70
+    guide.append(['Filled sample', 'Supported question types are prefilled. Choices use their labels as saved values. Single visibility conditions are included; tables, repeatable groups, and compound rules are omitted. Workflow includes line manager, custom, and group approvals, followed by work-order creation and the reference input-set fields.'])
+    guide.row_dimensions[guide.max_row].height = 100
     for cell in guide[guide.max_row]:
         cell.font = Font(name='Arial', size=11)
         cell.alignment = Alignment(vertical='top', wrap_text=True)

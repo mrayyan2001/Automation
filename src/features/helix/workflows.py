@@ -5,11 +5,18 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
+from features.helix.fulfillment import (REFERENCE as FULFILLMENT_REFERENCE, WORK_ORDER,
+    creates_work_item, other_fields, remedy_connections, resolve_connection,
+    validate_work_order, value_expression, work_order_rows)
+
 REFERENCE = json.loads(Path(__file__).with_name('workflow_reference.json').read_text())
 LEGACY_HEADERS = ['Service name', 'Row type', 'Name', 'Type', 'Scope', 'Question label',
            'Default value', 'Target', 'Input mapping', 'Output mapping', 'From', 'To', 'Condition']
-HEADERS = ['Service name', 'Approval type', 'Approval summary', 'Approvers']
-APPROVALS = ['Line manager approval', 'Custom Approval']
+PREVIOUS_HEADERS = ['Service name', 'Approval type', 'Approval summary', 'Approvers']
+HEADERS = ['Service name', 'Label', 'Step type', 'Summary', 'Approvers', 'Support company',
+           'Support organization', 'Support group', 'Template', 'Connection ID', 'Priority', 'Other fields']
+APPROVALS = ['Line manager approval', 'Custom Approval', 'Group Approval']
+WORKFLOW_TYPES = APPROVALS + [WORK_ORDER]
 STEPS = {'Start': 'StartEventDefinition', 'End': 'EndEventDefinition',
          'Exclusive gateway': 'ExclusiveGatewayDefinition', 'Call process': 'CallActivityDefinition',
          'Service task': 'ServiceTaskDefinition'}
@@ -37,7 +44,7 @@ def _field(kind, name, identifier, now):
     return field
 
 
-def add_workflow_sheet(workbook):
+def add_workflow_sheet(workbook, environment=None):
     from openpyxl.styles import Alignment, Font
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.datavalidation import DataValidation
@@ -54,19 +61,34 @@ def add_workflow_sheet(workbook):
             cell.font = Font(name='Arial', size=11, bold=cell.row == 1)
             cell.alignment = Alignment(vertical='center', wrap_text=True)
             cell.number_format = '@'
-    table = Table(displayName='WorkflowTable', ref='A1:D101')
+    table = Table(displayName='WorkflowTable', ref='A1:L101')
     table.tableStyleInfo = TableStyleInfo(name='TableStyleLight1', showRowStripes=False)
     sheet.add_table(table)
-    validation = DataValidation(type='list', formula1='"' + ','.join(APPROVALS) + '"', allow_blank=True)
+    validation = DataValidation(type='list', formula1='"' + ','.join(WORKFLOW_TYPES) + '"', allow_blank=True)
     validation.showDropDown = False
     validation.showErrorMessage = True
     sheet.add_data_validation(validation)
-    validation.add('B2:B1001')
+    validation.add('C2:C1001')
+    sheet.column_dimensions['J'].hidden = True
+    connections = remedy_connections(environment or {})
+    if connections:
+        from openpyxl.workbook.defined_name import DefinedName
+        for number, identifier in enumerate(connections, 1):
+            sheet.cell(number, 102, identifier)
+        sheet.column_dimensions['CX'].hidden = True
+        workbook.defined_names.add(DefinedName('WorkflowRemedyConnections', attr_text=f"'Workflow'!$CX$1:$CX${len(connections)}"))
+        validation = DataValidation(type='list', formula1='WorkflowRemedyConnections', allow_blank=True)
+        validation.showDropDown = False
+        validation.showErrorMessage = True
+        sheet.add_data_validation(validation)
+        validation.add('J2:J1001')
     guide = workbook['Guide']
     rows = [
-        ['Workflow', 'One approval per row. Service name must match Services. Row order is approval order; no From/To points or variables are needed.'],
-        ['Approval type', 'Choose Line manager approval or Custom Approval. Approval summary is optional. For Custom Approval, enter Approvers (the reference Flex Char 01 value).'],
-        ['Approval results', 'Approvals run in row order. After each approval, Approved continues to the next approval; any other status sets the request to Rejected and ends the service. Built-in steps and status checks are added automatically.'],
+        ['Workflow', 'One step per row. Service name must match Services. Steps execute in row order; built-in steps and connections are added automatically. Label is optional, but supplied labels must be unique within each service.'],
+        ['Approval steps', 'Choose Line manager approval, Custom Approval, or Group Approval. Summary is optional. Custom and Group Approval require Approvers; group names are formatted as group | Request Approver. Each approval has its own status check and rejection end.'],
+        ['Create work order', 'Choose Create work order. Fill Template or all of Support company, Support organization, and Support group. The default Remedy connection is selected automatically. Description always uses the questions-and-answers output.'],
+        ['Work-order extra fields', 'Priority is optional. Other fields use one field = value assignment per line (Alt+Enter), e.g. SLA_Code = 11X6. Up to three fields including Priority. Filled fields generate a Build Input Set step immediately before creation.'],
+        ['Fixed values / question answers', 'Type a fixed value or question: Label to use that question answer, e.g. question: Priority. Applies to work-order values, Summary, and Approvers. Use the labels entered on Questions.'],
     ]
     for values in rows:
         guide.append(values)
@@ -76,17 +98,17 @@ def add_workflow_sheet(workbook):
             cell.alignment = Alignment(vertical='top', wrap_text=True)
 
 
-def import_workflow_sheet(workbook, services, errors):
+def import_workflow_sheet(workbook, services, errors, environment=None):
     if 'Workflow' not in workbook.sheetnames:
         return {}
     from datetime import date, datetime
     iterator = workbook['Workflow'].iter_rows(max_row=1002, max_col=101)
     headers = [c.value for c in next(iterator)]
-    columns = LEGACY_HEADERS if headers[:len(LEGACY_HEADERS)] == LEGACY_HEADERS else HEADERS
+    columns = LEGACY_HEADERS if headers[:len(LEGACY_HEADERS)] == LEGACY_HEADERS else PREVIOUS_HEADERS if headers[:len(PREVIOUS_HEADERS)] == PREVIOUS_HEADERS else HEADERS
     if headers[:len(columns)] != columns or any(v is not None for v in headers[len(columns):]):
         raise ValueError('Workflow: headers do not match. Download a new template and keep its headers.')
     owners = {s['name'].casefold(): s for s in services}
-    locations = {}
+    locations, labels = {}, set()
     for number, cells in enumerate(iterator, 2):
         if all(c.value is None or str(c.value).strip() == '' for c in cells):
             continue
@@ -109,7 +131,15 @@ def import_workflow_sheet(workbook, services, errors):
                 if row['Row type'] == 'Variable':
                     check_name(row['Name'])
             else:
-                validate_approval(row)
+                row = normalize_row(row)
+                validate_step(row)
+                if row['Step type'] == WORK_ORDER:
+                    resolve_connection(row, environment or {})
+                label = (owner, row['Label'].casefold())
+                if row['Label'] and label in labels:
+                    raise ValueError('Workflow labels must be unique within each service.')
+                if row['Label']:
+                    labels.add(label)
             owners[owner].setdefault('workflow', []).append(row)
             locations.setdefault(owner, number)
         except ValueError as exc:
@@ -137,6 +167,12 @@ def _apply_advanced_workflow(workflow, rows, now):
         raise ValueError('Workflow must contain at most 1,000 row objects.')
     rows = [{h: str(r.get(h, '')).strip() for h in LEGACY_HEADERS} for r in rows]
     variables = [r for r in rows if r['Row type'] == 'Variable']
+    if creates_work_item(rows):
+        existing = next((r for r in variables if r['Name'].casefold() == 'workstatus'), None)
+        if existing and (existing['Name'] != 'WorkStatus' or existing['Scope'] != 'Local' or existing['Type'] != 'Text' or existing['Question label']):
+            raise ValueError('WorkStatus is reserved as a Local Text variable for work-item creation.')
+        if existing is None:
+            variables.append({'Name': 'WorkStatus', 'Scope': 'Local', 'Type': 'Text', 'Question label': '', 'Default value': ''})
     if any(r['Row type'] not in ('Variable', 'Step', 'Flow') for r in rows):
         raise ValueError('Workflow Row type must be Variable, Step, or Flow.')
     params = workflow['inputParams']
@@ -284,7 +320,7 @@ def _apply_advanced_workflow(workflow, rows, now):
         elif row['Target'] or row['Input mapping'] or row['Output mapping']:
             raise ValueError('Only Call process and Service task steps use Target and mappings.')
         elements.append(node)
-        cells.append({'id': node['guid'][3:], 'type': 'rx.' + kind.removesuffix('Definition'),
+        cells.append({'id': node['guid'][3:], 'type': 'rx.ProcessAction' if row['Type'] == 'Service task' else 'rx.' + kind.removesuffix('Definition'),
                       'position': {'x': 60 + (index % 5) * 180, 'y': 100 + (index // 5) * 150},
                       'size': {'width': 90 if row['Type'] in ('Call process', 'Service task') else 40 if row['Type'] == 'Exclusive gateway' else 30,
                                'height': 60 if row['Type'] in ('Call process', 'Service task') else 40 if row['Type'] == 'Exclusive gateway' else 30},
@@ -300,104 +336,233 @@ def _apply_advanced_workflow(workflow, rows, now):
     workflow['layout'] = json.dumps({'cells': cells})
 
 
-def fill_workflow_sample(workbook, service_name):
+def fill_workflow_sample(workbook, service_name, environment=None):
     sheet = workbook['Workflow']
-    for number, values in enumerate([
-        [service_name, 'Line manager approval', 'Line Manager Approval', ''],
-        [service_name, 'Custom Approval', '', 'Max'],
-    ], 2):
-        for column, value in enumerate(values, 1):
-            cell = sheet.cell(number, column, value)
+    rows = [
+        {'Step type': 'Line manager approval', 'Summary': 'Line Manager Approval'},
+        {'Step type': 'Custom Approval', 'Approvers': 'Max'},
+        {'Step type': 'Group Approval', 'Approvers': 'Example Support Group'},
+    ]
+    # Prefer the user's environment values; otherwise show the attached reference example.
+    connections = remedy_connections(environment or {})
+    for process in (environment or {}).get('processDefinitionGuidToProcessDefinition', {}).values():
+        for element in process.get('flowElements', []):
+            if element.get('actionTypeName') != FULFILLMENT_REFERENCE['workOrder']['actionTypeName']:
+                continue
+            values = {}
+            for mapping in element.get('inputMap', []):
+                try:
+                    value = json.loads(mapping['expression'])
+                    if isinstance(value, str):
+                        values[mapping['assignTarget']] = value
+                except (ValueError, TypeError):
+                    pass
+            if values.get('connectionId') != (resolve_connection({}, environment) if connections else None):
+                continue
+            row = {'Step type': WORK_ORDER, 'Label': 'CreateSupportWorkOrder',
+                   'Connection ID': values['connectionId'], 'Priority': 'Medium'}
+            if values.get('templateName'):
+                row['Template'] = values['templateName']
+            else:
+                targets = [('Support company', 'requestAssigneeSupportGroupCompany'),
+                           ('Support organization', 'requestAssigneeSupportOrganization'),
+                           ('Support group', 'requestAssigneeSupportGroupName')]
+                if not all(values.get(target) for _, target in targets):
+                    continue
+                row.update({column: values[target] for column, target in targets})
+            rows.append(row)
+            break
+        if rows[-1]['Step type'] == WORK_ORDER:
+            break
+    if rows[-1]['Step type'] != WORK_ORDER:
+        # The complete sample always ends with fulfillment, even for a new environment.
+        mappings = {m['assignTarget']: m['expression'] for m in FULFILLMENT_REFERENCE['workOrder']['inputMap']}
+        row = {'Step type': WORK_ORDER, 'Label': 'CreateSupportWorkOrder', 'Priority': 'Medium'}
+        for column, target in [('Template', 'templateName'), ('Support company', 'requestAssigneeSupportGroupCompany'),
+                               ('Support organization', 'requestAssigneeSupportOrganization'), ('Support group', 'requestAssigneeSupportGroupName')]:
+            if target in mappings:
+                value = json.loads(mappings[target])
+                if isinstance(value, str):
+                    row[column] = value
+        rows.append(row)
+    # Include the full input-set example from the attached work-order reference.
+    extras = {m['assignTarget']: m['expression'] for m in FULFILLMENT_REFERENCE['buildInputSet']['inputMap']}
+    fields = []
+    for index in range(1, 4):
+        if f'key{index}' not in extras or f'value{index}' not in extras:
+            continue
+        key, value = json.loads(extras[f'key{index}']), json.loads(extras[f'value{index}'])
+        if key == 'Priority':
+            rows[-1]['Priority'] = value
+        else:
+            fields.append(f'{key} = {value}')
+    rows[-1]['Other fields'] = '\n'.join(fields)
+    for number, row in enumerate(rows, 2):
+        row['Service name'] = service_name
+        for column, header in enumerate(HEADERS, 1):
+            cell = sheet.cell(number, column, row.get(header, ''))
             cell.data_type = 's'
 
 
-def validate_approval(row):
-    if row.get('Approval type') == 'Ad hoc approval':
-        row['Approval type'] = 'Custom Approval'
-    if row.get('Approval type') not in APPROVALS:
-        raise ValueError('Choose Line manager approval or Custom Approval.')
-    if row['Approval type'] == 'Custom Approval' and not row.get('Approvers', '').strip():
-        raise ValueError('Custom Approval requires Approvers.')
-    if row['Approval type'] == 'Line manager approval' and row.get('Approvers', '').strip():
-        raise ValueError('Line manager approval determines the manager automatically; leave Approvers blank.')
+def normalize_row(row):
+    result = {h: '' if row.get(h) is None else str(row.get(h, '')).strip() for h in HEADERS}
+    result['Step type'] = result['Step type'] or str(row.get('Approval type') or '').strip()
+    result['Summary'] = result['Summary'] or str(row.get('Approval summary') or '').strip()
+    if result['Step type'] == 'Ad hoc approval':
+        result['Step type'] = 'Custom Approval'
+    return result
 
 
-def apply_workflow(workflow, rows, now):
-    """Build the standard service pipeline from an ordered approval list."""
+def validate_step(row):
+    kind = row['Step type']
+    if kind not in WORKFLOW_TYPES:
+        raise ValueError('Choose a supported Step type: ' + ', '.join(WORKFLOW_TYPES) + '.')
+    if row['Label'].casefold() in {'start', 'qanswer', 'end'}:
+        raise ValueError('Start, QAnswer, and End are reserved workflow labels.')
+    if kind == WORK_ORDER:
+        validate_work_order(row)
+    else:
+        if kind in ('Custom Approval', 'Group Approval') and not row['Approvers']:
+            raise ValueError(kind + ' requires Approvers.')
+        if kind == 'Line manager approval' and row['Approvers']:
+            raise ValueError('Line manager approval determines the manager automatically; leave Approvers blank.')
+        if any(row[h] for h in ('Support company', 'Support organization', 'Support group', 'Template', 'Connection ID', 'Priority', 'Other fields')):
+            raise ValueError('Work-order fields are only available for Create work order steps.')
+
+
+def _unique_labels(workflow, primary_labels=None):
+    # Explicit user labels get priority; every generated node and flow receives a distinct label.
+    primary_labels = primary_labels or {}
+    used = {label.casefold() for label in primary_labels.values()}
+    for element in workflow['flowElements']:
+        if element['name'] in primary_labels:
+            element['name'] = primary_labels[element['name']]
+            continue
+        base = name = element['name']
+        suffix = 1
+        while name.casefold() in used:
+            name = base + 'Next' + pascal_name(str(suffix))
+            suffix += 1
+        element['name'] = name
+        used.add(name.casefold())
+    nodes = {e['guid'][3:]: e for e in workflow['flowElements']}
+    layout = json.loads(workflow['layout'])
+    for cell in layout['cells']:
+        if cell['id'] in nodes and 'position' in cell:
+            cell['content'] = nodes[cell['id']]['name']
+    workflow['layout'] = json.dumps(layout)
+
+
+def apply_workflow(workflow, rows, now, environment=None):
+    """Build approvals and work-order creation in the user's row order."""
     if not isinstance(rows, list) or len(rows) > 1000 or any(not isinstance(r, dict) for r in rows):
         raise ValueError('Workflow must contain at most 1,000 row objects.')
     if rows and any('Row type' in row for row in rows):
         _apply_advanced_workflow(workflow, rows, now)
         _ensure_qanswer(workflow, now)
+        _unique_labels(workflow)
         return
-    rows = [{h: '' if r.get(h) is None else str(r.get(h, '')).strip() for h in HEADERS} for r in rows]
+    rows = [normalize_row(row) for row in rows]
     if len(rows) > 30:
-        raise ValueError('Use at most 30 approval steps per service.')
+        raise ValueError('Use at most 30 workflow steps per service.')
+    labels = set()
+    names = {'Start', 'QAnswer', 'End', 'WorkStatus'}
+    def allocate(base):
+        name = base
+        while name.casefold() in {v.casefold() for v in names}:
+            name += 'Next'
+        names.add(name)
+        return name
+    models = []
+    for index, row in enumerate(rows):
+        validate_step(row)
+        if row['Label'] and row['Label'].casefold() in labels:
+            raise ValueError('Workflow labels must be unique within each service.')
+        if row['Label']:
+            labels.add(row['Label'].casefold())
+        kind = row['Step type']
+        base = {APPROVALS[0]: 'LineManagerApproval', 'Custom Approval': 'CustomApproval', 'Group Approval': 'GroupApproval', WORK_ORDER: 'CreateWorkOrder'}[kind]
+        name = allocate(pascal_name(row['Label']) if row['Label'] else base + 'Next' * index)
+        models.append((row, name))
+    # Mirror automatic question-variable naming before compiling expression mappings.
+    reserved = {'context'} | ({'workstatus'} if any(r['Step type'] == WORK_ORDER for r in rows) else set())
+    question_names = {}
+    for param in workflow['inputParams']:
+        name = pascal_name(param['name'])
+        while name.casefold() in reserved:
+            name += 'Next'
+        question_names[param['name'].casefold()] = name
+        reserved.add(name.casefold())
     expanded = [
         {'Row type': 'Step', 'Name': 'Start', 'Type': 'Start'},
         {'Row type': 'Step', 'Name': 'QAnswer', 'Type': 'Call process',
-         'Target': next(iter(REFERENCE['dependencies'].values()))['name'],
-         'Input mapping': 'SBContext = ${processContext.Context}'},
+         'Target': next(iter(REFERENCE['dependencies'].values()))['name'], 'Input mapping': 'SBContext = ${processContext.Context}'},
         {'Row type': 'Flow', 'From': 'Start', 'To': 'QAnswer'},
     ]
     previous = 'QAnswer'
-    for index, row in enumerate(rows):
-        validate_approval(row)
-        kind = row['Approval type']
-        reference = next(e for e in REFERENCE['workflow']['flowElements']
-                         if e.get('name') == ('manager approval' if kind == 'Line manager approval' else 'Ad-Hoc Approval'))
-        name = ('LineManagerApproval' if kind == 'Line manager approval' else 'CustomApproval') + 'Next' * index
+    previous_condition = ''
+    positions = {'Start': (60, 115), 'QAnswer': (240, 100)}
+    primary_labels = {}
+    x = 420
+    for row, name in models:
+        kind = row['Step type']
+        if row['Label']:
+            primary_labels[name] = row['Label']
+        if kind == WORK_ORDER:
+            builder_name = allocate(name + 'Inputs') if other_fields(row) else None
+            work, entry = work_order_rows(row, name, question_names, environment or {}, builder_name=builder_name)
+            if entry != name:
+                positions[entry] = (x, 100)
+                x += 180
+            expanded.extend(work)
+            expanded.append({'Row type': 'Flow', 'From': previous, 'To': entry, 'Condition': previous_condition})
+            positions[name] = (x, 100)
+            previous, previous_condition = name, ''
+            x += 180
+            continue
+        reference = FULFILLMENT_REFERENCE['groupApproval'] if kind == 'Group Approval' else next(
+            e for e in REFERENCE['workflow']['flowElements'] if e.get('name') == ('manager approval' if kind == APPROVALS[0] else 'Ad-Hoc Approval'))
         mappings = deepcopy(reference['inputMap'])
         for mapping in mappings:
-            if mapping['assignTarget'] == 'Approval Summary' and row.get('Approval summary', '').strip():
-                mapping['expression'] = json.dumps(row['Approval summary'].strip())
+            if mapping['assignTarget'] == 'Approval Summary' and row['Summary']:
+                mapping['expression'] = value_expression(row['Summary'], question_names)
             if mapping['assignTarget'] == 'Flex Char 01':
-                mapping['expression'] = json.dumps(row['Approvers'].strip())
-        check = name + 'Status'
-        rejected = name + 'Rejected'
+                value = value_expression(row['Approvers'], question_names)
+                mapping['expression'] = '(' + value + ' + " | Request Approver")' if kind == 'Group Approval' else value
+        check, rejected, end = allocate(name + 'Status'), allocate(name + 'Rejected'), allocate(name + 'RejectedEnd')
         expanded.extend([
             {'Row type': 'Step', 'Name': name, 'Type': 'Call process', 'Target': reference['calledProcessDefinitionName'],
              'Input mapping': '\n'.join(m['assignTarget'] + ' = ' + m['expression'] for m in mappings)},
-            {'Row type': 'Flow', 'From': previous, 'To': name},
+            {'Row type': 'Flow', 'From': previous, 'To': name, 'Condition': previous_condition},
             {'Row type': 'Step', 'Name': check, 'Type': 'Exclusive gateway'},
             {'Row type': 'Flow', 'From': name, 'To': check},
             {'Row type': 'Step', 'Name': rejected, 'Type': 'Service task', 'Target': 'myit-sb:setServiceRequestStatus',
              'Input mapping': 'requestId = ${processContext.Context.serviceRequest.id}\nstatus = "Rejected"'},
             {'Row type': 'Flow', 'From': check, 'To': rejected},
-            {'Row type': 'Step', 'Name': rejected + 'End', 'Type': 'End'},
-            {'Row type': 'Flow', 'From': rejected, 'To': rejected + 'End'},
+            {'Row type': 'Step', 'Name': end, 'Type': 'End'},
+            {'Row type': 'Flow', 'From': rejected, 'To': end},
         ])
-        # The approved branch joins the following step; its condition refers to this approval.
-        previous = check
+        positions.update({name: (x, 100), check: (x + 180, 110), rejected: (x + 155, 260), end: (x + 185, 410)})
+        previous, previous_condition = check, '${activityResults.' + name + '.Status} = "Approved"'
+        x += 360
     expanded.append({'Row type': 'Step', 'Name': 'End', 'Type': 'End'})
-    expanded.append({'Row type': 'Flow', 'From': previous, 'To': 'End'})
-    for row in expanded:
-        if row['Row type'] == 'Flow' and row['From'].endswith('Status') and not row['To'].endswith('Rejected'):
-            approval = row['From'].removesuffix('Status')
-            row['Condition'] = '${activityResults.' + approval + '.Status} = "Approved"'
+    expanded.append({'Row type': 'Flow', 'From': previous, 'To': 'End', 'Condition': previous_condition})
+    positions['End'] = (x, 115)
     _apply_advanced_workflow(workflow, expanded, now)
-    # Keep the approved path on the top row and each rejection branch below its gateway.
-    positions = {'Start': (60, 100), 'QAnswer': (240, 100), 'End': (420 + len(rows) * 360, 100)}
-    for index, row in enumerate(rows):
-        name = ('LineManagerApproval' if row['Approval type'] == 'Line manager approval' else 'CustomApproval') + 'Next' * index
-        positions.update({name: (420 + index * 360, 100), name + 'Status': (600 + index * 360, 110),
-                          name + 'Rejected': (575 + index * 360, 260), name + 'RejectedEnd': (605 + index * 360, 410)})
     nodes = {e['guid'][3:]: e for e in workflow['flowElements']}
     layout = json.loads(workflow['layout'])
     for cell in layout['cells']:
         element = nodes[cell['id']]
         if element['name'] in positions:
-            x, y = positions[element['name']]
-            cell['position'] = {'x': x, 'y': y}
-            if element['resourceType'].endswith('EndEventDefinition'):
-                label = 'End (rejected)' if element['name'].endswith('RejectedEnd') else 'End (approved)' if rows else 'End'
-                element['name'] = label
-                cell['content'] = label
+            px, py = positions[element['name']]
+            cell['position'] = {'x': px, 'y': py}
         elif element.get('sourceNode'):
             source = nodes[element['sourceNode'][3:]]
             if source['resourceType'].endswith('ExclusiveGatewayDefinition'):
+                cell['flowType'] = 'conditional' if element['condition'] else 'default'
                 cell['labels'] = [{'attrs': {'text': {'text': 'Approved' if element['condition'] else 'Not approved'}}, 'position': 0.5}]
     workflow['layout'] = json.dumps(layout)
+    _unique_labels(workflow, primary_labels)
 
 
 def _ensure_qanswer(workflow, now):

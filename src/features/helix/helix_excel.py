@@ -91,11 +91,22 @@ def build_excel_template(data: dict, sample: dict | None = None) -> bytes:
         for row in range(2, 52):
             sheet.cell(row, 2, spec["templates"][0]["name"])
     add_question_sheets(workbook)
-    add_workflow_sheet(workbook)
+    add_workflow_sheet(workbook, data)
+    # Dynamic list includes newly entered services and names beyond blank rows.
+    service_range = "'Services'!$A$2:$A$1000"
+    service_names = f"'Services'!$A$2:INDEX({service_range},MAX(1,IFERROR(LOOKUP(2,1/({service_range}<>\"\"),ROW({service_range})-ROW('Services'!$A$2)+1),1)))"
+    workbook.defined_names.add(DefinedName('ServiceNameOptions', attr_text=service_names))
+    for name in ('Questions', 'Workflow'):
+        validation = DataValidation(type='list', formula1='ServiceNameOptions', allow_blank=True)
+        validation.showDropDown = False
+        validation.showErrorMessage = True
+        validation.error = 'Choose a service name from the Services tab.'
+        workbook[name].add_data_validation(validation)
+        validation.add('A2:A1001')
     workbook.move_sheet("Guide", offset=len(workbook.sheetnames) - 1 - workbook.sheetnames.index("Guide"))
     if sample is not None:
         from features.helix.excel_sample import fill_excel_sample
-        fill_excel_sample(workbook, spec, sample)
+        fill_excel_sample(workbook, spec, sample, environment=data)
     output = io.BytesIO()
     workbook.save(output)
     workbook.close()
@@ -174,7 +185,7 @@ def import_excel(data: dict, contents: bytes) -> dict:
             except ValueError as exc:
                 errors.append({"sheet": "Services", "row": row_number, "message": str(exc)})
         question_rows = import_question_sheets(workbook, services, errors)
-        workflow_rows = import_workflow_sheet(workbook, services, errors)
+        workflow_rows = import_workflow_sheet(workbook, services, errors, data)
         for service in services:
             try:
                 create_service(data, service["templateId"], service["name"], service["fieldValues"],

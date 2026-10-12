@@ -46,6 +46,9 @@ ROOT = Path(__file__).resolve().parents[1]
 class HelixTests(unittest.IsolatedAsyncioTestCase):
     async def test_download_excel_sample_and_import(self):
         source = json.loads((ROOT / 'reference' / 'Service with questions.json').read_text())
+        fulfillment = json.loads((ROOT / 'reference' / 'WorkOrder.json').read_text())
+        for key in ('connectorIdToConnection', 'rxConnectionIdToConnectionId'):
+            source[key] = fulfillment[key]
         environment = self.service.save_environment('Excel sample', source)
         base = f"/helix/api/environments/{environment['id']}"
         response = await self.client.get(base + '/excel-sample')

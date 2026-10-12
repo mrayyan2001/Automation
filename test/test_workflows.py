@@ -15,6 +15,9 @@ from features.helix.workflows import HEADERS, REFERENCE, apply_workflow, fill_wo
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
         self.source = json.loads((Path(__file__).parents[1] / 'reference/Workflow.json').read_text())
+        fulfillment = json.loads((Path(__file__).parents[1] / 'reference/WorkOrder.json').read_text())
+        for key in ('connectorIdToConnection', 'rxConnectionIdToConnectionId'):
+            self.source[key] = fulfillment[key]
         self.workbook = load_workbook(io.BytesIO(build_excel_template(self.source)))
         spec = excel_spec(self.source)
         template = spec['templates'][0]
@@ -35,6 +38,10 @@ class WorkflowTests(unittest.TestCase):
                 self.workbook[sheet].cell(number, column, values[cell.value])
 
     def row(self, number, **values):
+        if 'Approval type' in values:
+            values['Step type'] = values.pop('Approval type')
+        if 'Approval summary' in values:
+            values['Summary'] = values.pop('Approval summary')
         self.write('Workflow', number, {'Service name': self.service['name'], **values})
 
     def imported(self):
@@ -48,8 +55,11 @@ class WorkflowTests(unittest.TestCase):
         return export, export['processDefinitionGuidToProcessDefinition'][main_id]
 
     def test_template_hides_automatic_nodes_and_variables(self):
-        self.assertEqual([c.value for c in self.workbook['Workflow'][1]], HEADERS)
-        self.assertEqual(HEADERS, ['Service name', 'Approval type', 'Approval summary', 'Approvers'])
+        self.assertEqual([c.value for c in self.workbook['Workflow'][1][:len(HEADERS)]], HEADERS)
+        self.assertIn('Label', HEADERS)
+        self.assertIn('Step type', HEADERS)
+        for hidden in ('From', 'To', 'Condition', 'Scope', 'Variable name'):
+            self.assertNotIn(hidden, HEADERS)
         self.assertTrue(all(c.value is None for c in self.workbook['Workflow'][2]))
         result = self.imported()
         self.assertEqual(result['errors'], [])
@@ -72,7 +82,7 @@ class WorkflowTests(unittest.TestCase):
         ends = [e for e in nodes.values() if e['resourceType'].endswith('EndEventDefinition')]
         self.assertEqual(len(starts), 1)
         self.assertEqual(len(ends), len(expected) + 1 if not any(e['name'] == 'Decision' for e in nodes.values()) else 1)
-        final_end = next(e for e in ends if e['name'] != 'End (rejected)')
+        final_end = next(e for e in ends if e['name'] == 'End')
         rejection_ends = set()
         def outgoing(identifier):
             return [f for f in flows if f['sourceNode'] == identifier]
@@ -101,6 +111,11 @@ class WorkflowTests(unittest.TestCase):
                 self.assertNotIn(rejection_end, rejection_ends)
                 rejection_ends.add(rejection_end)
             current = passed['targetNode']
+        while current != final_end['guid']:
+            node = nodes[current]
+            self.assertIn(node.get('actionTypeName'), ['myit-sb:buildInputSet', 'com.bmc.myservice.connect.remedy:createRemedyWorkOrderWithIdentifiers'])
+            self.assertEqual(len(outgoing(current)), 1)
+            current = outgoing(current)[0]['targetNode']
         self.assertEqual(current, final_end['guid'])
         self.assertEqual({c['id'] for c in json.loads(process['layout'])['cells']}, {e['guid'][3:] for e in elements})
 
@@ -109,7 +124,7 @@ class WorkflowTests(unittest.TestCase):
         result = self.imported()
         self.assertEqual(result['errors'], [])
         export, process = self.workflow(result['services'][0])
-        self.assert_pipeline(export, process, ['LineManagerApproval', 'CustomApproval'])
+        self.assert_pipeline(export, process, ['LineManagerApproval', 'CustomApproval', 'GroupApproval'])
         adhoc = next(e for e in process['flowElements'] if e['name'].startswith('CustomApproval') and e.get('inputMap'))
         self.assertIn({'assignTarget': 'Flex Char 01', 'expression': '"Max"'}, adhoc['inputMap'])
         services = [result['services'][0], {**result['services'][0], 'name': 'Second service'}]

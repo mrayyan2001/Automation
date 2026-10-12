@@ -1,0 +1,152 @@
+{
+  "groupApproval": {
+    "resourceType": "com.bmc.arsys.rx.services.process.domain.CallActivityDefinition",
+    "lastUpdateTime": 1791843026435,
+    "lastChangedBy": "hiba",
+    "owner": "hiba",
+    "name": "Ad-Hoc Group Approval",
+    "tags": null,
+    "description": null,
+    "overlayGroupId": null,
+    "internal": false,
+    "guid": "rx-ba52fbd3-aee7-4e29-aa1b-d92e73aef32b",
+    "multiInstanceLoopDefinition": null,
+    "calledProcessDefinitionName": "com.bmc.arsys.myitsb.myitsb-approval:Request Approval",
+    "sampleProcessDefinitionName": null,
+    "inputMap": [
+      {
+        "assignTarget": "Requesting For User Id",
+        "expression": "${processContext.Context.requestedFor.loginName}"
+      },
+      {
+        "assignTarget": "Approval Summary",
+        "expression": "(\"Ad-hoc Group Approval for \" + ${processContext.Context.serviceRequest.id})"
+      },
+      {
+        "assignTarget": "Approval Process Name",
+        "expression": "\"SB Ad-Hoc Approval Process\""
+      },
+      {
+        "assignTarget": "Service Name",
+        "expression": "${processContext.Context.service.name}"
+      },
+      {
+        "assignTarget": "SB Service Request ID",
+        "expression": "${processContext.Context.serviceRequest.id}"
+      },
+      {
+        "assignTarget": "Flex Char 01",
+        "expression": "(${processContext.GroupApprover} + \" | Request Approver\")"
+      }
+    ],
+    "outputMap": []
+  },
+  "workOrder": {
+    "resourceType": "com.bmc.arsys.rx.services.process.domain.ServiceTaskDefinition",
+    "lastUpdateTime": 1791843026435,
+    "lastChangedBy": "hiba",
+    "owner": "hiba",
+    "name": "EUC IT Store Support WO",
+    "tags": null,
+    "description": null,
+    "overlayGroupId": null,
+    "internal": false,
+    "guid": "rx-e70d8b5c-bfb8-47b7-afaf-72d0690b5bc5",
+    "multiInstanceLoopDefinition": null,
+    "actionTypeName": "com.bmc.myservice.connect.remedy:createRemedyWorkOrderWithIdentifiers",
+    "inputMap": [
+      {
+        "assignTarget": "connectionId",
+        "expression": "\"f6e642c9-783b-476c-88c8-37a9060d6280\""
+      },
+      {
+        "assignTarget": "customerLoginId",
+        "expression": "${processContext.Context.requestedFor.loginName}"
+      },
+      {
+        "assignTarget": "contactLoginId",
+        "expression": "${processContext.Context.requestedBy.loginName}"
+      },
+      {
+        "assignTarget": "summary",
+        "expression": "${processContext.Context.service.name}"
+      },
+      {
+        "assignTarget": "description",
+        "expression": "${activityResults.rx-f1249bfa-219a-47b6-96a8-832b7685f2fd.OutputText}"
+      },
+      {
+        "assignTarget": "templateName",
+        "expression": "\"EUC IT Store\""
+      },
+      {
+        "assignTarget": "attachments",
+        "expression": "${processContext.AttachementQuestion}"
+      },
+      {
+        "assignTarget": "correlationId",
+        "expression": "$\\PROCESSCORRELATIONID$"
+      },
+      {
+        "assignTarget": "requestAssigneeSupportGroupCompany",
+        "expression": "\"DIB-IT\""
+      },
+      {
+        "assignTarget": "requestAssigneeSupportOrganization",
+        "expression": "\"IT-RtB & Service Operations\""
+      },
+      {
+        "assignTarget": "requestAssigneeSupportGroupName",
+        "expression": "\"EUC IT Store Support\""
+      },
+      {
+        "assignTarget": "otherFields",
+        "expression": "${activityResults.rx-7e43de2a-5d2c-4016-a76c-e4787d532b15.output.inputs}"
+      }
+    ],
+    "outputMap": [],
+    "runAsUser": null
+  },
+  "buildInputSet": {
+    "resourceType": "com.bmc.arsys.rx.services.process.domain.ServiceTaskDefinition",
+    "lastUpdateTime": 1791843026435,
+    "lastChangedBy": "hiba",
+    "owner": "hiba",
+    "name": "Build Input Set SLA",
+    "tags": null,
+    "description": null,
+    "overlayGroupId": null,
+    "internal": false,
+    "guid": "rx-7e43de2a-5d2c-4016-a76c-e4787d532b15",
+    "multiInstanceLoopDefinition": null,
+    "actionTypeName": "myit-sb:buildInputSet",
+    "inputMap": [
+      {
+        "assignTarget": "key1",
+        "expression": "\"SLA_Code\""
+      },
+      {
+        "assignTarget": "value1",
+        "expression": "\"11X6\""
+      },
+      {
+        "assignTarget": "key2",
+        "expression": "\"Priority\""
+      },
+      {
+        "assignTarget": "value2",
+        "expression": "\"Medium\""
+      },
+      {
+        "assignTarget": "key3",
+        "expression": "\"ASCPY\""
+      },
+      {
+        "assignTarget": "value3",
+        "expression": "\"DIB-IT\""
+      }
+    ],
+    "outputMap": [],
+    "runAsUser": null
+  }
+}

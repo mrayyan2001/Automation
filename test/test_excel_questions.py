@@ -134,6 +134,9 @@ class ExcelQuestionsTest(unittest.TestCase):
         self.assertEqual(config['max']['relativeLimit']['numberOfUnits'], 30)
 
     def test_simple_template_and_sample_round_trip(self):
+        fulfillment = json.loads((Path(__file__).parents[1] / 'reference/WorkOrder.json').read_text())
+        for key in ('connectorIdToConnection', 'rxConnectionIdToConnectionId'):
+            self.source[key] = fulfillment[key]
         with tempfile.TemporaryDirectory() as directory:
             storage = HelixService(Path(directory) / 'helix.sqlite3')
             environment = storage.save_environment('Sample', self.source)
@@ -165,7 +168,7 @@ class ExcelQuestionsTest(unittest.TestCase):
             for option in q['config'].get('options', []):
                 self.assertEqual(option['dataValue'], option['displayValue'])
                 self.assertFalse(option['disabled'])
-        self.assertEqual(create_package(self.source, result['services'])['connectorIdToConnection'], {})
+        self.assertEqual(create_package(self.source, result['services'])['connectorIdToConnection'], self.source['connectorIdToConnection'])
 
     def test_inline_choices_conditions_and_row_errors(self):
         del self.workbook['Questions']
