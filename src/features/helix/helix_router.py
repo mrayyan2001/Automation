@@ -37,6 +37,7 @@ class CreateServiceRequest(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=50)
     questions: list[dict] = Field(default_factory=list, max_length=100)
     questionnaireActions: list[dict] = Field(default_factory=list, max_length=100)
+    workflow: list[dict] = Field(default_factory=list, max_length=1000)
 
 
 class CreatePackageRequest(BaseModel):

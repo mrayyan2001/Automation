@@ -108,6 +108,8 @@ def fill_excel_sample(workbook, spec, sample):
                 row['Value'] = next((str(mapping.get(v, v)) for v in expected if v is not None), '(no value)')
         write('Questions', number, row)
         workbook['Questions'].row_dimensions[number].height = max(36, 16 * len(options) + 8)
+    from features.helix.workflows import fill_workflow_sample
+    fill_workflow_sample(workbook, sample['name'])
     guide = workbook['Guide']
     guide.append(['Filled sample', 'Supported question types are prefilled. Choices use their labels as saved values. Single visibility conditions are included; tables, repeatable groups, and compound rules are omitted.'])
     guide.row_dimensions[guide.max_row].height = 70

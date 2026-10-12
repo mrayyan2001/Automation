@@ -12,6 +12,7 @@ from openpyxl.workbook.defined_name import DefinedName
 
 from features.helix.service_generator import category_hierarchy, create_service, inspect_export
 from features.helix.excel_questions import add_question_sheets, import_question_sheets
+from features.helix.workflows import add_workflow_sheet, import_workflow_sheet
 
 SUPPORTED = {"MULTILINE_INPUT", "RICH_INPUT", "TEXT_INPUT", "SINGLELINE_INPUT", "DROPDOWN"}
 
@@ -90,6 +91,8 @@ def build_excel_template(data: dict, sample: dict | None = None) -> bytes:
         for row in range(2, 52):
             sheet.cell(row, 2, spec["templates"][0]["name"])
     add_question_sheets(workbook)
+    add_workflow_sheet(workbook)
+    workbook.move_sheet("Guide", offset=len(workbook.sheetnames) - 1 - workbook.sheetnames.index("Guide"))
     if sample is not None:
         from features.helix.excel_sample import fill_excel_sample
         fill_excel_sample(workbook, spec, sample)
@@ -171,12 +174,13 @@ def import_excel(data: dict, contents: bytes) -> dict:
             except ValueError as exc:
                 errors.append({"sheet": "Services", "row": row_number, "message": str(exc)})
         question_rows = import_question_sheets(workbook, services, errors)
+        workflow_rows = import_workflow_sheet(workbook, services, errors)
         for service in services:
             try:
                 create_service(data, service["templateId"], service["name"], service["fieldValues"],
-                               service["categoryIds"], service["tags"], service.get("questions", []))
+                               service["categoryIds"], service["tags"], service.get("questions", []), workflow_rows=service.get("workflow", []))
             except ValueError as exc:
-                errors.append({"sheet": "Questions", "row": question_rows.get(service["name"].casefold(), 1),
+                errors.append({"sheet": "Workflow" if service.get("workflow") else "Questions", "row": workflow_rows.get(service["name"].casefold(), question_rows.get(service["name"].casefold(), 1)),
                                "message": f"{service['name']}: {exc}"})
         if len(services) > 50:
             raise ValueError("Import at most 50 services into one package.")

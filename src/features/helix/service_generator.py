@@ -7,6 +7,7 @@ import json
 from uuid import uuid4
 
 from features.helix.questions import build_questionnaire
+from features.helix.workflows import apply_workflow, workflow_dependencies
 
 
 def inspect_export(data: dict) -> dict:
@@ -120,7 +121,7 @@ def _workflow(name: str, now: int) -> dict:
     }
 
 
-def create_service(data: dict, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None, questions: list[dict] | None = None, questionnaire_actions: list[dict] | None = None) -> dict:
+def create_service(data: dict, template_id: str | None, name: str, field_values: dict, category_ids: list[str], tags: list[str] | None = None, questions: list[dict] | None = None, questionnaire_actions: list[dict] | None = None, workflow_rows: list[dict] | None = None) -> dict:
     info = inspect_export(data)
     if template_id is None and len(info["templates"]) == 1:
         template_id = info["templates"][0]["id"]
@@ -198,6 +199,7 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
     now = int(datetime.now(timezone.utc).timestamp() * 1000)
     workflow = _workflow(f"myit-sb:Service Workflow {token}", now)
     questionnaire = build_questionnaire(questions or [], workflow, name, now)
+    apply_workflow(workflow, workflow_rows or [], now)
     if questionnaire and questionnaire_actions:
         representation = json.loads(questionnaire["jsonRepresentation"])
         representation["actions"] = deepcopy(questionnaire_actions)
@@ -259,6 +261,10 @@ def create_service(data: dict, template_id: str | None, name: str, field_values:
     }
     output["services"].append(service)
     output["selectedServiceIds"].append(service["id"])
+    for dependency in workflow_dependencies(workflow, data, now):
+        output["processDefinitionGuidToProcessDefinition"][dependency["guid"]] = dependency
+        output["processDefinitionNameToProcessDefinitionGuid"][dependency["name"]] = dependency["guid"]
+        output["processGuidToSubCatalogName"][dependency["guid"]] = None
     output["processDefinitionGuidToProcessDefinition"][workflow["guid"]] = workflow
     output["processDefinitionNameToProcessDefinitionGuid"][workflow["name"]] = workflow["guid"]
     output["processGuidToSubCatalogName"][workflow["guid"]] = None
@@ -281,7 +287,7 @@ def create_package(data: dict, services: list[dict]) -> dict:
             "oldGroupIdToQuestionnaireTranslations", "connectorIdToConnection")
     for service in services:
         export = create_service(source, service.get("templateId"), service["name"], service.get("fieldValues", {}),
-                                service.get("categoryIds", []), service.get("tags", []), service.get("questions", []), service.get("questionnaireActions", []))
+                                service.get("categoryIds", []), service.get("tags", []), service.get("questions", []), service.get("questionnaireActions", []), service.get("workflow", []))
         if package is None:
             package = export
         else:

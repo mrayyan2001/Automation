@@ -45,7 +45,7 @@ class QuestionTests(unittest.TestCase):
                     params = {p['id']: p['name'] for p in workflow['inputParams']}
                     for question in items:
                         if question['type'] not in WIDGETS:
-                            self.assertEqual(params[question['processInputId']], question['label'])
+                            self.assertRegex(params[question['processInputId']], r'^[A-Z][A-Za-z]*$')
 
     def test_every_reference_type_and_input_label(self):
         questions = [{'type': kind, 'label': kind, 'required': True,

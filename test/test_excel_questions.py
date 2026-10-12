@@ -73,7 +73,7 @@ class ExcelQuestionsTest(unittest.TestCase):
         representation = json.loads(export['questionnaires'][0]['jsonRepresentation'])
         params = {p['id']: p['name'] for p in export['processDefinitionGuidToProcessDefinition'][representation['workflowId']]['inputParams']}
         for q in representation['pages'][0]['pageItems']:
-            self.assertEqual(params[q['processInputId']], q['label'])
+            self.assertEqual(params[q['processInputId']], __import__('features.helix.workflows', fromlist=['pascal_name']).pascal_name(q['label']))
         self.assertEqual(export['connectorIdToConnection'], {})
 
     def test_old_services_only_workbook_is_supported(self):
@@ -140,7 +140,7 @@ class ExcelQuestionsTest(unittest.TestCase):
             sample = storage.sample_service(environment['id'])
             contents = build_excel_template(self.source, sample)
         workbook = load_workbook(io.BytesIO(contents))
-        self.assertEqual(workbook.sheetnames, ['Services', 'Questions', 'Guide'])
+        self.assertEqual(workbook.sheetnames, ['Services', 'Questions', 'Workflow', 'Guide'])
         self.assertTrue(workbook['Services'].column_dimensions['B'].hidden)
         self.assertEqual([c.value for c in workbook['Questions'][1][:len(QUESTION_HEADERS)]], QUESTION_HEADERS)
         operation_list = next(v for v in workbook['Questions'].data_validations.dataValidation if str(v.sqref) == 'L2:L1001')
