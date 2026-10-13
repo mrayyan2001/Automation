@@ -18,6 +18,7 @@ from common.annotation.common.component_annotation import (
 )
 from common.annotation.common.discovery import iter_modules
 from common.annotation.fastapi_di import get_bean
+from common.annotation.common.dependency import is_component_dependency
 from common.response import SuccessResponse
 
 controller_component = component_annotation("controller")
@@ -57,14 +58,15 @@ class ComponentRoute(APIRoute):
     def __init__(self, path: str, endpoint: Any, **kwargs: Any) -> None:
         signature = inspect.signature(endpoint)
         parameters = []
+        component_dependencies = []
 
         for parameter in signature.parameters.values():
             dependency_type = parameter.annotation
             if (
-                inspect.isclass(dependency_type)
-                and is_component(dependency_type)
+                is_component_dependency(dependency_type)
                 and parameter.default is inspect.Parameter.empty
             ):
+                component_dependencies.append(dependency_type)
                 parameter = parameter.replace(
                     default=Depends(get_bean(dependency_type)),
                 )
@@ -72,6 +74,7 @@ class ComponentRoute(APIRoute):
 
         endpoint.__signature__ = signature.replace(parameters=parameters)
         super().__init__(path=path, endpoint=endpoint, **kwargs)
+        self.component_dependencies = component_dependencies
 
 
 class AppRouter(APIRouter):
@@ -131,7 +134,7 @@ def Controller(prefix: str, **router_kwargs: Any):
         kwargs = {"tags": [tag], **router_kwargs}
         router = AppRouter(prefix=prefix.rstrip("/"), **kwargs)
 
-        for method in vars(cls).values():
+        for method in list(vars(cls).values()):
             route = getattr(method, "__route__", None)
             if route is None:
                 continue
@@ -171,3 +174,17 @@ def include_scanned_routers(app: Any, packages: str | list[str]) -> None:
 
     for router in scan_routers(packages):
         app.include_router(router)
+
+
+def validate_router_dependencies(routers: list[APIRouter], context: Any) -> None:
+    """Resolve controller and method components before publishing their routes."""
+
+    for router in routers:
+        for route in router.routes:
+            for dependency in getattr(route, "component_dependencies", ()):
+                try:
+                    context.get(dependency)
+                except (LookupError, TypeError, RuntimeError) as exc:
+                    raise RuntimeError(
+                        f"Invalid dependency {dependency!r} for route {route.path}: {exc}"
+                    ) from exc

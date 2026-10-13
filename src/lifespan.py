@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from common.annotation.router import scan_routers
+from common.annotation.router import scan_routers, validate_router_dependencies
 from common.config.config import load_config
 from context import create_application_context
 
@@ -24,10 +24,12 @@ async def initialize_context(app: FastAPI) -> None:
     packages = ["features", "common"]
     logger.info("Scanning application controllers in the background...")
     routers = await asyncio.to_thread(scan_routers, packages)
-    app.state.context = await asyncio.to_thread(
+    context = await asyncio.to_thread(
         create_application_context,
         packages,
     )
+    await asyncio.to_thread(validate_router_dependencies, routers, context)
+    app.state.context = context
     # Publish routes on the event loop after their dependencies are ready.
     if not getattr(app.state, "routers_registered", False):
         for router in routers:

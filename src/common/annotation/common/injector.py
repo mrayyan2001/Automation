@@ -8,7 +8,7 @@ class DependencyInjector:
 
     def create(self, cls: type) -> Any:
         signature = inspect.signature(cls.__init__)
-        type_hints = get_type_hints(cls.__init__)
+        type_hints = get_type_hints(cls.__init__, include_extras=True)
         dependencies = {}
 
         for name, parameter in signature.parameters.items():

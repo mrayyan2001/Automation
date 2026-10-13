@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <title>Automation</title>
+    <title>{{ title }}</title>
     <style>
       * { box-sizing: border-box; }
       body {
@@ -34,6 +34,13 @@
       <div class="brand">Automation</div>
       <h1>Your automation<br>starts here.</h1>
       <p>Explore the API, try an endpoint, and build your next workflow.</p>
+      {% if tags %}
+      <ul aria-label="Tags">
+        {% for tag in tags %}
+        <li>{{ tag }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       <nav aria-label="API resources">
         <a class="primary" href="/docs">Explore the API &rarr;</a>
         <a href="/redoc">API reference</a>
