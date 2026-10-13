@@ -1,0 +1,38 @@
+@base = http://localhost:8012/reference/books
+@bookId = replace-with-id-from-create-response
+
+### Default service: SQLite
+POST {{base}}
+Content-Type: application/json
+
+{"title":"The Hobbit","author":"J. R. R. Tolkien"}
+
+### Default list
+GET {{base}}
+
+### Read a book
+GET {{base}}/{{bookId}}
+
+### Qualified JSON service
+POST {{base}}/json
+Content-Type: application/json
+
+{"title":"Dune","author":"Frank Herbert"}
+
+### Qualified list; independent of SQLite
+GET {{base}}/json
+
+### list[BookService]: one result per implementation
+GET {{base}}/backends
+
+### Delete default-store book
+DELETE {{base}}/{{bookId}}
+
+### Missing ID: 404 error envelope
+GET {{base}}/does-not-exist
+
+### Validation: whitespace title returns 422
+POST {{base}}
+Content-Type: application/json
+
+{"title":"   ","author":"Someone"}
