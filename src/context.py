@@ -4,6 +4,7 @@ from common.annotation.common.annotation import scan_annotation
 from common.annotation.common.component_annotation import COMPONENT_ANNOTATIONS
 from common.annotation.common.dependency import dependency_spec
 from common.annotation.common.injector import DependencyInjector
+from common.annotation.common.discovery import iter_modules
 
 
 class ApplicationContext:
@@ -55,6 +56,10 @@ class ApplicationContext:
 
 def create_application_context(packages: list[str]) -> ApplicationContext:
     context = ApplicationContext()
+    # Import modules before taking the annotation snapshot: importing a service
+    # or repository can introduce its component annotation kind.
+    for _ in iter_modules(packages):
+        pass
     # Discover all types before constructing beans so resolution does not depend
     # on discovery order or on which implementations have been instantiated.
     for annotation_name in tuple(COMPONENT_ANNOTATIONS):

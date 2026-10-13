@@ -24,11 +24,12 @@ from common.response import SuccessResponse
 controller_component = component_annotation("controller")
 
 
-def _route(method: str, path: str):
+def _route(method: str, path: str, **kwargs: Any):
     """Mark a controller method with an HTTP method and path."""
 
     def decorator(handler: Any) -> Any:
         handler.__route__ = (method, path)
+        handler.__route_options__ = kwargs
         return handler
 
     return decorator
@@ -40,10 +41,22 @@ def Get(path: str):
     return _route("get", path)
 
 
-def Post(path: str):
+def Post(path: str, **kwargs: Any):
     """Mark a controller method as a ``POST`` endpoint."""
 
-    return _route("post", path)
+    return _route("post", path, **kwargs)
+
+
+def Put(path: str, **kwargs: Any):
+    return _route("put", path, **kwargs)
+
+
+def Patch(path: str, **kwargs: Any):
+    return _route("patch", path, **kwargs)
+
+
+def Delete(path: str, **kwargs: Any):
+    return _route("delete", path, **kwargs)
 
 
 def is_component(cls: type) -> bool:
@@ -144,6 +157,7 @@ def Controller(prefix: str, **router_kwargs: Any):
                 path,
                 _controller_endpoint(cls, method),
                 methods=[http_method.upper()],
+                **getattr(method, "__route_options__", {}),
             )
 
         cls.__router__ = router
