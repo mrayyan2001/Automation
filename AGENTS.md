@@ -5,9 +5,32 @@
 Python 3.12+ FastAPI starts in `src/main.py`. Shared annotations, configuration,
 responses, and errors live in `src/common/`; `src/context.py` and `src/lifespan.py`
 manage discovery and initialization. Organize features under `src/features/`
-using `api/`, `domain/`, `services/`, and `repositories/`. Keep contracts beside
-implementations. Store HTML in `pages/`, automated tests in `test/`, and API
+using `api/`, `domain/`, `services/`, and `repositories/`. Store HTML in `pages/`, automated tests in `test/`, and API
 request examples in `http/`.
+
+## Package Responsibilities & File Boundaries
+
+Each package must serve one purpose:
+
+- `api/`: HTTP parsing, request/response schemas, routing, and response mapping.
+- `domain/`: entities, value types, and domain definitions, independent of HTTP and storage.
+- `services/`: business operations, validation, and coordination through repository contracts.
+- `repositories/`: persistence contracts and storage adapters; no HTTP handlers.
+
+Create additional subpackages only for distinct responsibilities. Avoid mixing
+unrelated features or putting business logic and filesystem access in routers.
+Omit unused layers; stateless converters do not need repositories.
+
+Put every ABC contract in its own file and each concrete implementation in a
+separate file in the same responsibility package. Examples:
+
+- `services/task_service.py` → `TaskService`; `task_service_impl.py` → `TaskServiceImpl`.
+- `repositories/task_repository.py` → `TaskRepository`; `txt_task_repository.py` → `TxtTaskRepository`.
+- `api/converter_router.py` → `ConverterRouter`; `converter_router_impl.py` → `ConverterRouterImpl`.
+
+Implementations import and inherit their contracts; contracts must not import
+implementations. Keep `__init__.py` focused on package declarations or deliberate
+exports, not application logic.
 
 ## Development Commands
 
