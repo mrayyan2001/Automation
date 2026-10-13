@@ -81,7 +81,8 @@ class WorkflowTests(unittest.TestCase):
         starts = [e for e in nodes.values() if e['resourceType'].endswith('StartEventDefinition')]
         ends = [e for e in nodes.values() if e['resourceType'].endswith('EndEventDefinition')]
         self.assertEqual(len(starts), 1)
-        self.assertEqual(len(ends), len(expected) + 1 if not any(e['name'] == 'Decision' for e in nodes.values()) else 1)
+        work_orders = [e for e in nodes.values() if 'createRemedyWorkOrder' in e.get('actionTypeName', '')]
+        self.assertEqual(len(ends), len(expected) + len(work_orders) + 1 if not any(e['name'] == 'Decision' for e in nodes.values()) else 1)
         final_end = next(e for e in ends if e['name'] == 'End')
         rejection_ends = set()
         def outgoing(identifier):
@@ -111,9 +112,18 @@ class WorkflowTests(unittest.TestCase):
                 self.assertNotIn(rejection_end, rejection_ends)
                 rejection_ends.add(rejection_end)
             current = passed['targetNode']
+        visited = set()
         while current != final_end['guid']:
+            self.assertNotIn(current, visited)
+            visited.add(current)
             node = nodes[current]
-            self.assertIn(node.get('actionTypeName'), ['myit-sb:buildInputSet', 'com.bmc.myservice.connect.remedy:createRemedyWorkOrderWithIdentifiers'])
+            if node['resourceType'].endswith('ReceiveTaskDefinition'):
+                self.assertEqual(node['signalParams'], ['WorkStatus'])
+            elif node['resourceType'].endswith('ExclusiveGatewayDefinition'):
+                current = next(f['targetNode'] for f in outgoing(current) if f['condition'] == '${processContext.WorkStatus} = "Completed"')
+                continue
+            else:
+                self.assertIn(node.get('actionTypeName'), ['myit-sb:buildInputSet', 'com.bmc.myservice.connect.remedy:createRemedyWorkOrderWithIdentifiers'])
             self.assertEqual(len(outgoing(current)), 1)
             current = outgoing(current)[0]['targetNode']
         self.assertEqual(current, final_end['guid'])

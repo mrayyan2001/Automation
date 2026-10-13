@@ -148,5 +148,24 @@
     ],
     "outputMap": [],
     "runAsUser": null
+  },
+  "receiveTask": {
+    "resourceType": "com.bmc.arsys.rx.services.process.domain.ReceiveTaskDefinition",
+    "lastUpdateTime": 1791843026435,
+    "lastChangedBy": "hiba",
+    "owner": "hiba",
+    "name": "Receive Task WO2",
+    "tags": null,
+    "description": null,
+    "overlayGroupId": null,
+    "internal": false,
+    "guid": "rx-b672f1bb-733a-4674-8c45-3c4f393b5ff4",
+    "multiInstanceLoopDefinition": null,
+    "signalParams": [
+      "Work Status"
+    ],
+    "outputMap": [],
+    "callbackKeyValues": null,
+    "correlationType": "AUTOMATIC"
   }
 }

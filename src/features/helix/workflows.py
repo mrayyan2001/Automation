@@ -460,6 +460,7 @@ def apply_workflow(workflow, rows, now, environment=None):
     if rows and any('Row type' in row for row in rows):
         _apply_advanced_workflow(workflow, rows, now)
         _ensure_qanswer(workflow, now)
+        _ensure_work_order_receipts(workflow, now)
         _unique_labels(workflow)
         return
     rows = [normalize_row(row) for row in rows]
@@ -518,7 +519,7 @@ def apply_workflow(workflow, rows, now, environment=None):
             expanded.append({'Row type': 'Flow', 'From': previous, 'To': entry, 'Condition': previous_condition})
             positions[name] = (x, 100)
             previous, previous_condition = name, ''
-            x += 180
+            x += 540  # Leave room for the hidden receive task and status gateway.
             continue
         reference = FULFILLMENT_REFERENCE['groupApproval'] if kind == 'Group Approval' else next(
             e for e in REFERENCE['workflow']['flowElements'] if e.get('name') == ('manager approval' if kind == APPROVALS[0] else 'Ad-Hoc Approval'))
@@ -562,7 +563,82 @@ def apply_workflow(workflow, rows, now, environment=None):
                 cell['flowType'] = 'conditional' if element['condition'] else 'default'
                 cell['labels'] = [{'attrs': {'text': {'text': 'Approved' if element['condition'] else 'Not approved'}}, 'position': 0.5}]
     workflow['layout'] = json.dumps(layout)
+    _ensure_work_order_receipts(workflow, now)
     _unique_labels(workflow, primary_labels)
+
+
+def _ensure_work_order_receipts(workflow, now):
+    """Wait for every work order; continue only on Completed, end on Cancelled."""
+    elements = workflow['flowElements']
+    work_orders = [e for e in elements if re.search(r'create.*(?:work.?order|wo(?:$|[^A-Za-z]))', e.get('actionTypeName', ''), re.I)]
+    if not work_orders:
+        return
+    layout = json.loads(workflow['layout'])
+    positions = {c['id']: c.get('position', {}) for c in layout['cells']}
+    used = {e['name'].casefold() for e in elements}
+    def unique(base):
+        name, suffix = base, 1
+        while name.casefold() in used:
+            name = base + 'Next' + pascal_name(str(suffix))
+            suffix += 1
+        used.add(name.casefold())
+        return name
+    for wo in work_orders:
+        outgoing = [e for e in elements if e.get('sourceNode') == wo['guid']]
+        if len(outgoing) != 1 or outgoing[0]['condition']:
+            raise ValueError('Each work order requires one unconditional continuation before its automatic status check.')
+        continuation = outgoing[0]
+        base = {key: wo.get(key) for key in ('lastUpdateTime', 'lastChangedBy', 'owner', 'tags', 'description', 'internal')}
+        base.update(lastUpdateTime=now, overlayGroupId=None)
+        def node(name, kind, **settings):
+            element = {**base, 'guid': 'rx-' + str(uuid4()), 'name': unique(name),
+                       'resourceType': 'com.bmc.arsys.rx.services.process.domain.' + kind, **settings}
+            elements.append(element)
+            return element
+        receive = node('Receive Task WO2', 'ReceiveTaskDefinition',
+                       multiInstanceLoopDefinition=None, signalParams=['WorkStatus'], outputMap=[],
+                       callbackKeyValues=None, correlationType=FULFILLMENT_REFERENCE['receiveTask']['correlationType'])
+        gateway = node(pascal_name(wo['name']) + 'WorkStatus', 'ExclusiveGatewayDefinition')
+        cancelled = node(pascal_name(wo['name']) + 'Cancelled', 'ServiceTaskDefinition',
+                         multiInstanceLoopDefinition=None, actionTypeName='myit-sb:setServiceRequestStatus',
+                         inputMap=[{'assignTarget': 'requestId', 'expression': '${processContext.Context.serviceRequest.id}'},
+                                   {'assignTarget': 'status', 'expression': '"Cancelled"'}], outputMap=[], runAsUser=None)
+        end = node(pascal_name(wo['name']) + 'CancelledEnd', 'EndEventDefinition', event=None)
+        position = positions.get(wo['guid'][3:], {})
+        x, y = position.get('x', 420), position.get('y', 100)
+        for element, kind, px, py, width, height in [
+            (receive, 'rx.ReceiveTask', x + 180, y, 90, 60),
+            (gateway, 'rx.ExclusiveGateway', x + 360, y + 10, 40, 40),
+            (cancelled, 'rx.ProcessAction', x + 335, y + 160, 90, 60),
+            (end, 'rx.EndEvent', x + 365, y + 310, 30, 30),
+        ]:
+            layout['cells'].append({'id': element['guid'][3:], 'type': kind, 'content': element['name'],
+                                    'position': {'x': px, 'y': py}, 'size': {'width': width, 'height': height},
+                                    'z': len(layout['cells']) + 1})
+        # Preserve the user's following step, but gate it on completion.
+        continuation['sourceNode'] = gateway['guid']
+        continuation['condition'] = '${processContext.WorkStatus} = "Completed"'
+        cell = next(c for c in layout['cells'] if c['id'] == continuation['guid'][3:])
+        cell.update(source={'id': gateway['guid'][3:]}, flowType='conditional',
+                    labels=[{'attrs': {'text': {'text': 'Completed'}}, 'position': 0.5}])
+        def flow(source, target, condition='', label='', default=False):
+            element = {**base, 'guid': 'rx-' + str(uuid4()), 'name': unique('Sequence Flow'),
+                       'resourceType': 'com.bmc.arsys.rx.services.process.domain.SequenceFlowDefinition',
+                       'sourceNode': source['guid'], 'targetNode': target['guid'], 'condition': condition}
+            elements.append(element)
+            cell = {'id': element['guid'][3:], 'type': 'rx.SequenceFlow',
+                    'source': {'id': source['guid'][3:]}, 'target': {'id': target['guid'][3:]},
+                    'z': len(layout['cells']) + 1, 'flowType': 'default' if default else 'conditional' if condition else 'normal',
+                    'labels': [{'attrs': {'text': {'text': label}}, 'position': 0.5}] if label else []}
+            if default:
+                cell['vertices'] = [{'x': x + 380, 'y': y + 110}, {'x': x + 225, 'y': y + 110}]
+            layout['cells'].append(cell)
+        flow(wo, receive)
+        flow(receive, gateway)
+        flow(gateway, cancelled, '${processContext.WorkStatus} = "Cancelled"', 'Cancelled')
+        flow(cancelled, end)
+        flow(gateway, receive, label='Wait for update', default=True)
+    workflow['layout'] = json.dumps(layout)
 
 
 def _ensure_qanswer(workflow, now):
