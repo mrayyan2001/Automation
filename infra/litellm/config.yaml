@@ -1,0 +1,26 @@
+credential_list:
+  - credential_name: ollama-cloud-credentials
+    credential_values:
+      api_base: os.environ/OLLAMA_API_BASE
+      api_key: os.environ/OLLAMA_API_KEY
+    credential_info:
+      description: Ollama Cloud credentials
+      custom_llm_provider: ollama
+
+model_list:
+  - model_name: gemma4:31b
+    litellm_params:
+      model: ollama_chat/gemma4:31b
+      litellm_credential_name: ollama-cloud-credentials
+
+litellm_settings:
+  drop_params: true
+
+router_settings:
+  enable_router_rate_limit: true
+  num_retries: 1
+
+general_settings:
+  master_key: os.environ/MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: true
