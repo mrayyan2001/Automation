@@ -1,11 +1,11 @@
 """Interpret component dependency annotations shared by constructors and routes."""
 
-from abc import ABC
 import inspect
+from abc import ABC
 from typing import Annotated, get_args, get_origin
 
-from common.annotation.common.component_annotation import COMPONENT_ANNOTATIONS
 from common.annotation.common.annotation import has_any_annotation
+from common.annotation.common.component_annotation import COMPONENT_ANNOTATIONS
 from common.annotation.qualifier import Qualifier
 
 

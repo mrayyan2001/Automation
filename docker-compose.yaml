@@ -1,0 +1,10 @@
+services:
+  app:
+    container_name: app
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
+    restart: unless-stopped
+

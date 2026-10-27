@@ -1,8 +1,8 @@
 """Verify interface, collection, default and named dependency resolution."""
 
+import unittest
 from abc import ABC, abstractmethod
 from typing import Annotated
-import unittest
 
 import httpx
 from fastapi import FastAPI
@@ -40,10 +40,18 @@ class GreetingRouter:
         self.greeting = greeting
 
     @Get("/")
-    def greetings(self, default: Greeting, all_services: list[Greeting],
-                  named: Annotated[Greeting, Qualifier("spanish")]) -> dict:
-        return {"default": default.greet(), "all": [item.greet() for item in all_services],
-                "named": named.greet(), "constructor": self.greeting.greet()}
+    def greetings(
+        self,
+        default: Greeting,
+        all_services: list[Greeting],
+        named: Annotated[Greeting, Qualifier("spanish")],
+    ) -> dict:
+        return {
+            "default": default.greet(),
+            "all": [item.greet() for item in all_services],
+            "named": named.greet(),
+            "constructor": self.greeting.greet(),
+        }
 
 
 class InjectionTests(unittest.IsolatedAsyncioTestCase):
@@ -56,23 +64,32 @@ class InjectionTests(unittest.IsolatedAsyncioTestCase):
         app = FastAPI()
         app.state.context = self.context()
         app.include_router(GreetingRouter.__router__)
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
             response = await client.get("/injection/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"], {
-            "default": "hello", "all": ["hello", "hola"],
-            "named": "hola", "constructor": "hola",
-        })
+        self.assertEqual(
+            response.json()["data"],
+            {
+                "default": "hello",
+                "all": ["hello", "hola"],
+                "named": "hola",
+                "constructor": "hola",
+            },
+        )
 
     def test_ambiguity_missing_and_singleton(self):
         context = self.context()
         self.assertIs(context.get(Greeting), context.get(English))
         with self.assertRaisesRegex(LookupError, "No component"):
             context.get(Annotated[Greeting, Qualifier("missing")])
+
         @Service
         class Alternative(Greeting):
             def greet(self):
                 return "hey"
+
         context = ApplicationContext()
         context.component_types = {Spanish, Alternative}
         with self.assertRaisesRegex(LookupError, "Ambiguous"):
@@ -90,6 +107,7 @@ class InjectionTests(unittest.IsolatedAsyncioTestCase):
         class OtherPrimary(Greeting):
             def greet(self):
                 return "hey"
+
         context = self.context()
         context.component_types.add(OtherPrimary)
         with self.assertRaisesRegex(LookupError, "Ambiguous"):
@@ -99,6 +117,7 @@ class InjectionTests(unittest.IsolatedAsyncioTestCase):
 class StartupValidationTests(unittest.IsolatedAsyncioTestCase):
     async def test_ambiguous_route_fails_during_initialization(self):
         from unittest.mock import patch
+
         from lifespan import initialize_context
 
         @Service
@@ -109,8 +128,9 @@ class StartupValidationTests(unittest.IsolatedAsyncioTestCase):
         context = ApplicationContext()
         context.component_types.update([Spanish, Alternative, GreetingRouter])
         app = FastAPI()
-        with patch("lifespan.scan_routers", return_value=[GreetingRouter.__router__]), patch(
-            "lifespan.create_application_context", return_value=context
+        with (
+            patch("lifespan.scan_routers", return_value=[GreetingRouter.__router__]),
+            patch("lifespan.create_application_context", return_value=context),
         ):
             with self.assertRaisesRegex(RuntimeError, "route /injection/.*Ambiguous"):
                 await initialize_context(app)
@@ -119,13 +139,15 @@ class StartupValidationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_valid_dependencies_are_resolved_before_requests(self):
         from unittest.mock import patch
+
         from lifespan import initialize_context
 
         context = ApplicationContext()
         context.component_types.update([English, Spanish, GreetingRouter])
         app = FastAPI()
-        with patch("lifespan.scan_routers", return_value=[GreetingRouter.__router__]), patch(
-            "lifespan.create_application_context", return_value=context
+        with (
+            patch("lifespan.scan_routers", return_value=[GreetingRouter.__router__]),
+            patch("lifespan.create_application_context", return_value=context),
         ):
             await initialize_context(app)
         self.assertIs(app.state.context, context)

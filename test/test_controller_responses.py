@@ -2,10 +2,9 @@
 
 import unittest
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
-import httpx
-
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import PlainTextResponse
@@ -39,7 +38,9 @@ class TestController:
 
     @Get("/http-error")
     async def http_error(self) -> dict:
-        raise HTTPException(401, "Token required", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            401, "Token required", headers={"WWW-Authenticate": "Bearer"}
+        )
 
     @Get("/unknown")
     async def unknown(self) -> dict:
@@ -75,7 +76,10 @@ class ControllerResponseTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("success", schemas["SuccessResponse_Item_"]["properties"])
 
     async def test_empty_and_explicit_response(self):
-        self.assertEqual((await self.client.get("/test/empty")).json(), {"success": True, "data": None})
+        self.assertEqual(
+            (await self.client.get("/test/empty")).json(),
+            {"success": True, "data": None},
+        )
         self.assertEqual((await self.client.get("/test/text")).text, "hello")
 
     async def test_errors(self):
@@ -91,7 +95,10 @@ class ControllerResponseTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status_code, status)
                 self.assertFalse(response.json()["success"])
                 self.assertEqual(response.json()["errorData"]["errorCode"], code)
-        self.assertEqual((await self.client.get("/test/http-error")).headers["WWW-Authenticate"], "Bearer")
+        self.assertEqual(
+            (await self.client.get("/test/http-error")).headers["WWW-Authenticate"],
+            "Bearer",
+        )
 
 
 if __name__ == "__main__":

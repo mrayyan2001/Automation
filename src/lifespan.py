@@ -10,6 +10,7 @@ from context import create_application_context
 
 logger = logging.getLogger(__name__)
 
+
 def log_task_error(task: asyncio.Task) -> None:
     if not task.cancelled() and (error := task.exception()) is not None:
         logger.error(

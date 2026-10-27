@@ -11,10 +11,10 @@ from fastapi import (
 from fastapi.encoders import (
     jsonable_encoder,
 )
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     JSONResponse,
 )
-from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
 from common.exception.api_exception import (

@@ -2,7 +2,6 @@
 
 import inspect
 from functools import wraps
-from time import sleep
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -16,9 +15,9 @@ from common.annotation.common.component_annotation import (
     COMPONENT_ANNOTATIONS,
     component_annotation,
 )
+from common.annotation.common.dependency import is_component_dependency
 from common.annotation.common.discovery import iter_modules
 from common.annotation.fastapi_di import get_bean
-from common.annotation.common.dependency import is_component_dependency
 from common.response import SuccessResponse
 
 controller_component = component_annotation("controller")

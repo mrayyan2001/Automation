@@ -1,8 +1,5 @@
 import asyncio
 import logging
-from typing import (
-    Any,
-)
 
 import uvicorn
 from fastapi import FastAPI
@@ -43,6 +40,7 @@ app.add_exception_handler(
 )
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
 
 async def run_server(
     server_config: dict,

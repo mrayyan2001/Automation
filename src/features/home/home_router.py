@@ -16,8 +16,11 @@ templates = Jinja2Templates(directory=HOME_PAGE.parent)
 @Controller("/")
 class HomeRouter:
     @Get("/")
-    async def home(self, request: Request,
-                   home_service: Annotated[HomeService, Qualifier("MznHomeService")]) -> HTMLResponse:
+    async def home(
+        self,
+        request: Request,
+        home_service: Annotated[HomeService, Qualifier("MznHomeService")],
+    ) -> HTMLResponse:
         return templates.TemplateResponse(
             request=request,
             name=HOME_PAGE.name,

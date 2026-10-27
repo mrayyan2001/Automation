@@ -29,8 +29,9 @@ class BackgroundStartupTests(unittest.IsolatedAsyncioTestCase):
                 raise TimeoutError("Test did not release discovery")
             return [router]
 
-        with patch("lifespan.scan_routers", side_effect=scan), patch(
-            "lifespan.create_application_context", return_value={}
+        with (
+            patch("lifespan.scan_routers", side_effect=scan),
+            patch("lifespan.create_application_context", return_value={}),
         ):
             async with app.router.lifespan_context(app):
                 try:
@@ -44,11 +45,17 @@ class BackgroundStartupTests(unittest.IsolatedAsyncioTestCase):
                     async with httpx.AsyncClient(
                         transport=httpx.ASGITransport(app=app), base_url="http://test"
                     ) as client:
-                        self.assertEqual((await client.get("/openapi.json")).status_code, 200)
-                        self.assertEqual((await client.get("/discovered")).status_code, 404)
+                        self.assertEqual(
+                            (await client.get("/openapi.json")).status_code, 200
+                        )
+                        self.assertEqual(
+                            (await client.get("/discovered")).status_code, 404
+                        )
                         release.set()
                         await asyncio.wait_for(app.state.context_task, timeout=5)
-                        self.assertEqual((await client.get("/discovered")).json(), {"ready": True})
+                        self.assertEqual(
+                            (await client.get("/discovered")).json(), {"ready": True}
+                        )
                         self.assertIn("/discovered", app.openapi()["paths"])
                 finally:
                     release.set()
@@ -56,6 +63,7 @@ class BackgroundStartupTests(unittest.IsolatedAsyncioTestCase):
     async def test_shutdown_cancels_initialization(self):
         app = FastAPI(lifespan=lifespan)
         app.state.config = {}
+
         async def initialize(_app):
             await asyncio.Event().wait()
 
