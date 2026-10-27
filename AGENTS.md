@@ -84,12 +84,22 @@ router → service → repository direction and existing response/error envelope
 
 Use four spaces, type annotations, `snake_case` files/functions, and `PascalCase`
 classes. Keep filesystem work off the event loop; retain locking and atomic writes.
+Use `async def` for router handlers, service and repository operations, and
+I/O-bound workflows. Await calls between layers and keep blocking I/O off the
+event loop.
 
-Add API test requests to `http/<feature>.http`, separated by `###`; include methods,
-URLs, headers, bodies, filters, and errors. Run via an IDE HTTP client. Follow `http/tasks.http`; retain automated tests.
+Add API test requests to `http/<feature>.http` for every endpoint, separated by
+`###`; include methods, URLs, headers, bodies, and successful, validation, and
+relevant error cases. Run via an IDE HTTP client. Follow `http/tasks.http`; retain
+automated tests.
+
+Prefix every API route with `/api/v{version}/` (for example, `/api/v1/tasks`).
 
 Automated tests use unittest, async test cases, and HTTPX ASGI clients. Use `test_*.py` / `test_*`, temporary storage, and cover validation, persistence,
 concurrency, and DI.
+
+Always add or update automated test cases for every code change. Run the relevant
+tests before finishing and report the results.
 
 ## Commits, PRs & Configuration
 

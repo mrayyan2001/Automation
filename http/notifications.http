@@ -1,0 +1,29 @@
+POST http://localhost:8000/api/v1/notifications/email/send
+Content-Type: application/json
+
+{
+  "receiver": "mohammad.t.mrayyan@gmail.com",
+  "subject": "Notification",
+  "body": "This is a notification email."
+}
+
+###
+
+POST http://localhost:8000/api/v1/notifications/email/send
+Content-Type: application/json
+
+{
+  "receiver": "",
+  "subject": "",
+  "body": ""
+}
+
+### Missing required fields (expected 422)
+
+POST http://localhost:8000/api/v1/notifications/email/send
+Content-Type: application/json
+
+{
+  "receiver": "recipient@example.com",
+  "subject": "Notification"
+}

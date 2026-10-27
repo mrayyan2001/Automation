@@ -46,6 +46,11 @@ class ErrorType(Enum):
         "CONFLICT",
         "The request conflicts with the current state.",
     )
+    EMAIL_DELIVERY_FAILED = (
+        502,
+        "EMAIL_DELIVERY_FAILED",
+        "The email could not be delivered.",
+    )
     INTERNAL_SERVER_ERROR = (
         500,
         "INTERNAL_SERVER_ERROR",
