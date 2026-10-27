@@ -19,7 +19,7 @@ class HomeRouter:
     async def home(
         self,
         request: Request,
-        home_service: Annotated[HomeService, Qualifier("MznHomeService")],
+        home_service: Annotated[HomeService, Qualifier("MhHomeService")],
     ) -> HTMLResponse:
         return templates.TemplateResponse(
             request=request,

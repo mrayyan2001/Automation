@@ -18,6 +18,6 @@ class HomeService(ABC):
 
 
 @Service
-class MznHomeService(HomeService):
+class MhHomeService(HomeService):
     def __init__(self):
-        super().__init__("MZN Company", ["IT", "AI"])
+        super().__init__("MH Company", ["IT", "AI"])
