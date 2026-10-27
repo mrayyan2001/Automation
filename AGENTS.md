@@ -5,7 +5,7 @@
 Python 3.12+ FastAPI starts in `src/main.py`. Shared annotations, configuration,
 responses, and errors live in `src/common/`; `src/context.py` and `src/lifespan.py`
 manage discovery and initialization. Organize features under `src/features/`
-using `api/`, `domain/`, `services/`, and `repositories/`. Store HTML in `pages/`, automated tests in `test/`, and API
+using `api/`, `domain/`, `services/`, and `repositories/`. Store HTML in `pages/`, automated tests in `tests`, and API
 request examples in `http/`.
 
 ## Package Responsibilities & File Boundaries
