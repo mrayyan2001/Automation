@@ -28,7 +28,7 @@ def log_task_error(task: asyncio.Task) -> None:
 async def initialize_context(app: FastAPI) -> None:
     """Discover routes and build dependencies without delaying server startup."""
 
-    packages = ["features", "common", "persistence"]
+    packages = ["features", "common", "persistence", "integrations"]
     logger.info("Scanning application controllers in the background...")
     routers = await asyncio.to_thread(scan_routers, packages)
     context = await asyncio.to_thread(

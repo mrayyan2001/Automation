@@ -83,7 +83,9 @@ def test_application_context_discovers_redis_cache_component(
 ) -> None:
     monkeypatch.setenv("APP_ENV", "dev")
 
-    context = create_application_context(["features", "common", "persistence"])
+    context = create_application_context(
+        ["features", "common", "persistence", "integrations"]
+    )
 
     assert isinstance(context.get(CacheClient), RedisClient)
     assert isinstance(context.get(OtpService), DefaultOtpService)
@@ -92,4 +94,5 @@ def test_application_context_discovers_redis_cache_component(
     } == {
         "Redis",
         "Citus PostgreSQL",
+        "LiteLLM",
     }
