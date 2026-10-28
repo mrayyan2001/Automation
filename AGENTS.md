@@ -140,6 +140,7 @@ Use 4-space indentation, readable type annotations, and small feature-focused mo
 - Follow SOLID principles: give each class and module one clear responsibility, depend on abstractions where useful, and keep components open to extension without coupling unrelated features.
 - Keep related behavior together and extract shared code only when it has multiple real callers. Avoid oversized utility modules and premature abstractions.
 - Keep the codebase free of warnings and errors reported by configured checks and IDE inspections. Run the checks after changes and resolve or narrowly suppress intentional, tool-specific false positives with a clear reason.
+- Keep application startup and dependency injection fast, targeting 100 ms or less for DI setup. Avoid heavyweight imports, repeated package scans, and unrelated work on the startup path. Measure server readiness and full DI readiness from their actual start points so displayed timings include discovery and initialization work.
 
 ## Testing Guidelines
 

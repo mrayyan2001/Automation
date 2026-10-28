@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 from starlette.requests import Request
 
@@ -38,8 +39,16 @@ class FakeDatabaseClient(HealthCheckClient):
             raise self.error
 
 
-def build_request() -> Request:
-    return Request({"type": "http", "method": "GET", "path": "/", "headers": []})
+def build_request(state: SimpleNamespace | None = None) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [],
+            "app": SimpleNamespace(state=state or SimpleNamespace()),
+        }
+    )
 
 
 def test_home_page_reports_redis_status_and_response_time() -> None:
@@ -89,5 +98,18 @@ def test_home_page_reports_unavailable_citus() -> None:
             "healthy",
             "unhealthy",
         ]
+
+    asyncio.run(run_request())
+
+
+def test_home_page_shows_server_and_di_startup_times() -> None:
+    async def run_request() -> None:
+        request = build_request(
+            SimpleNamespace(server_startup_ms=120.5, dependency_ready_ms=428.1)
+        )
+        response = await HomeRouter().home(request, [FakeCacheClient()])
+
+        assert response.context["server_startup_ms"] == 120.5
+        assert response.context["dependency_ready_ms"] == 428.1
 
     asyncio.run(run_request())

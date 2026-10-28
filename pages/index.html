@@ -51,6 +51,7 @@
       a:focus-visible { outline: 3px solid #8abfff; outline-offset: 4px; }
       .arrow { font-size: 18px; line-height: 1; }
       .status-card { margin-top: 88px; border: 1px solid var(--line); border-radius: 12px; background: rgba(23, 29, 24, .76); }
+      .startup-card { margin-top: 18px; }
       .status-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
       .status-heading h2 { margin: 0; font-size: 14px; font-weight: 650; }
       .live-label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
@@ -107,6 +108,19 @@
             <span class="result"><strong class="status {{ 'unhealthy' if check.status == 'unhealthy' else '' }}">{{ check.status|capitalize }}</strong><span class="latency">{{ check.response_time_ms }} ms</span></span>
           </div>
           {% endfor %}
+        </section>
+        <section class="status-card startup-card" aria-labelledby="startup-title">
+          <div class="status-heading">
+            <h2 id="startup-title">Startup timing</h2>
+          </div>
+          <div class="health-row">
+            <span class="service-name">Time to server up</span>
+            <span class="latency">{% if server_startup_ms is not none %}{{ server_startup_ms }} ms{% else %}Pending{% endif %}</span>
+          </div>
+          <div class="health-row">
+            <span class="service-name">Time to complete DI</span>
+            <span class="latency">{% if dependency_ready_ms is not none %}{{ dependency_ready_ms }} ms{% else %}Pending{% endif %}</span>
+          </div>
         </section>
       </main>
       <footer><span>{{ title }} &middot; Developer workspace</span><span>API documentation <span aria-hidden="true">&nearr;</span></span></footer>

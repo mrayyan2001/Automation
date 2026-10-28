@@ -1,6 +1,8 @@
 import inspect
+from collections.abc import Iterable
+from types import ModuleType
 
-from common.annotation.common.annotation import scan_annotation
+from common.annotation.common.annotation import has_any_annotation
 from common.annotation.common.component_annotation import COMPONENT_ANNOTATIONS
 from common.annotation.common.dependency import dependency_spec
 from common.annotation.common.discovery import iter_modules
@@ -66,16 +68,20 @@ class ApplicationContext:
         return self.register(candidates[0])
 
 
-def create_application_context(packages: list[str]) -> ApplicationContext:
+def create_application_context(
+    packages: list[str], modules: Iterable[ModuleType] | None = None
+) -> ApplicationContext:
     context = ApplicationContext()
-    # Import modules before taking the annotation snapshot: importing a service
-    # or repository can introduce its component annotation kind.
-    for _ in iter_modules(packages):
-        pass
-    # Discover all types before constructing beans so resolution does not depend
-    # on discovery order or on which implementations have been instantiated.
-    for annotation_name in tuple(COMPONENT_ANNOTATIONS):
-        context.component_types.update(scan_annotation(annotation_name, packages))
+    discovered_modules = (
+        list(modules) if modules is not None else list(iter_modules(packages))
+    )
+    annotations = set(COMPONENT_ANNOTATIONS)
+    for module in discovered_modules:
+        for _, cls in inspect.getmembers(module, inspect.isclass):
+            if cls.__module__ == module.__name__ and has_any_annotation(
+                cls, annotations
+            ):
+                context.component_types.add(cls)
     context.component_types = {
         cls for cls in context.component_types if not inspect.isabstract(cls)
     }

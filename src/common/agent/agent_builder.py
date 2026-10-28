@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import json
 import logging
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIChatModel
+if TYPE_CHECKING:
+    from pydantic_ai import Agent
+    from pydantic_ai.models.openai import OpenAIChatModel
 
 from common.agent.usage import record_agent_usage
 
@@ -113,6 +116,8 @@ class AgentBuilder[OutputT]:
         agent_role: str = "Builder",
         agent_name: str | None = None,
     ) -> None:
+        from pydantic_ai import Agent
+
         self.agent = Agent(
             model=model,
             output_type=output_type,

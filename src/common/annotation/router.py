@@ -1,7 +1,9 @@
 """Routers that automatically inject annotated application components."""
 
 import inspect
+from collections.abc import Iterable
 from functools import wraps
+from types import ModuleType
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -168,9 +170,15 @@ def Controller(prefix: str, **router_kwargs: Any):
 def scan_routers(packages: str | list[str]) -> list[AppRouter]:
     """Find application routers declared in the supplied packages."""
 
+    return scan_routers_in_modules(iter_modules(packages))
+
+
+def scan_routers_in_modules(modules: Iterable[ModuleType]) -> list[AppRouter]:
+    """Find application routers in modules that have already been discovered."""
+
     routers: dict[int, AppRouter] = {}
 
-    for module in iter_modules(packages):
+    for module in modules:
         for value in vars(module).values():
             if isinstance(value, AppRouter):
                 routers[id(value)] = value

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import time
+from socket import socket
 
 import uvicorn
 from fastapi import FastAPI
@@ -42,6 +44,14 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
+class StartupTimedServer(uvicorn.Server):
+    async def startup(self, sockets: list[socket] | None = None) -> None:
+        await super().startup(sockets)
+        app.state.server_startup_ms = round(
+            (time.perf_counter() - app.state.startup_started_at) * 1000, 2
+        )
+
+
 async def run_server(
     server_config: dict,
 ) -> None:
@@ -52,7 +62,8 @@ async def run_server(
         port=server_config[PORT_KEY],
         reload=server_config[RELOAD_KEY],
     )
-    server = uvicorn.Server(config)
+    app.state.startup_started_at = time.perf_counter()
+    server = StartupTimedServer(config)
     await server.serve()
 
 

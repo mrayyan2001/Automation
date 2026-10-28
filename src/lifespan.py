@@ -1,11 +1,16 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from time import perf_counter
 from typing import Protocol, runtime_checkable
 
 from fastapi import FastAPI
 
-from common.annotation.router import scan_routers, validate_router_dependencies
+from common.annotation.common.discovery import iter_modules
+from common.annotation.router import (
+    scan_routers_in_modules,
+    validate_router_dependencies,
+)
 from common.config.config import load_config
 from context import ApplicationContext, create_application_context
 
@@ -28,12 +33,15 @@ def log_task_error(task: asyncio.Task) -> None:
 async def initialize_context(app: FastAPI) -> None:
     """Discover routes and build dependencies without delaying server startup."""
 
+    startup_started_at = getattr(app.state, "startup_started_at", perf_counter())
     packages = ["features", "common", "persistence", "integrations"]
     logger.info("Scanning application controllers in the background...")
-    routers = await asyncio.to_thread(scan_routers, packages)
+    modules = await asyncio.to_thread(lambda: list(iter_modules(packages)))
+    routers = scan_routers_in_modules(modules)
     context = await asyncio.to_thread(
         create_application_context,
         packages,
+        modules,
     )
     await asyncio.to_thread(validate_router_dependencies, routers, context)
     app.state.context = context
@@ -43,6 +51,9 @@ async def initialize_context(app: FastAPI) -> None:
             app.include_router(router)
         app.state.routers_registered = True
     app.openapi_schema = None
+    app.state.dependency_ready_ms = round(
+        (perf_counter() - startup_started_at) * 1000, 2
+    )
     logger.info("Application controllers and dependencies are ready.")
 
 
@@ -62,6 +73,8 @@ async def shutdown(tasks: list[asyncio.Task], app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not hasattr(app.state, "startup_started_at"):
+        app.state.startup_started_at = perf_counter()
     if not hasattr(app.state, "config"):
         app.state.config = load_config()
 
