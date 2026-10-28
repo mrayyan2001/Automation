@@ -4,6 +4,9 @@ from typing import Any
 
 import pytest
 
+from context import create_application_context
+from features.otp.service.default_otp_service import DefaultOtpService
+from features.otp.service.otp_service import OtpService
 from persistence.cache.cache_client import CacheClient
 from persistence.cache.redis_client import RedisClient
 
@@ -72,3 +75,14 @@ def test_redis_client_rejects_non_positive_ttl() -> None:
 
     with pytest.raises(ValueError, match="Cache TTL must be greater than zero"):
         asyncio.run(run_set())
+
+
+def test_application_context_discovers_redis_cache_component(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "dev")
+
+    context = create_application_context(["features", "common", "persistence"])
+
+    assert isinstance(context.get(CacheClient), RedisClient)
+    assert isinstance(context.get(OtpService), DefaultOtpService)

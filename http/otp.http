@@ -1,0 +1,56 @@
+@baseUrl = http://localhost:8000
+
+### Send an OTP by email
+POST {{baseUrl}}/api/v1/otp/send
+Content-Type: application/json
+
+{
+  "receiver": "mohammad@mzn.dev",
+  "channel": "email",
+  "user_id": null,
+  "purpose": "register"
+}
+
+### Reject an unsupported channel value
+POST {{baseUrl}}/api/v1/otp/send
+Content-Type: application/json
+
+{
+  "receiver": "user@example.com",
+  "channel": "voice",
+  "user_id": null,
+  "purpose": "register"
+}
+
+### SMS is a known channel but is not implemented yet
+POST {{baseUrl}}/api/v1/otp/send
+Content-Type: application/json
+
+{
+  "receiver": "+15551234567",
+  "channel": "sms",
+  "user_id": null,
+  "purpose": "register"
+}
+
+### Check the OTP token returned by /send
+POST {{baseUrl}}/api/v1/otp/check
+Content-Type: application/json
+
+{
+  "otp": "123456",
+  "otp_token": "replace-with-token-returned-by-send",
+  "user_id": null,
+  "purpose": "register"
+}
+
+### Validation error: missing OTP code
+POST {{baseUrl}}/api/v1/otp/check
+Content-Type: application/json
+
+{
+  "otp": "",
+  "otp_token": "69aVkN2mn89TYZnvAFCT6IN2uzIb0EGJxuZDqMaDk7g",
+  "user_id": null,
+  "purpose": "register"
+}

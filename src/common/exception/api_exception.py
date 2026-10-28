@@ -51,6 +51,11 @@ class ErrorType(Enum):
         "EMAIL_DELIVERY_FAILED",
         "The email could not be delivered.",
     )
+    OTP_DELIVERY_FAILED = (
+        502,
+        "OTP_DELIVERY_FAILED",
+        "The one-time password could not be delivered.",
+    )
     INTERNAL_SERVER_ERROR = (
         500,
         "INTERNAL_SERVER_ERROR",
