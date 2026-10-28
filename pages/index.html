@@ -27,6 +27,12 @@
       a:hover { filter: brightness(1.15); }
       a:focus-visible { outline: 3px solid #8abfff; outline-offset: 4px; }
       footer { margin-top: 64px; color: #73879a; font-size: 13px; }
+      .health { margin-top: 36px; padding: 20px; border: 1px solid #344556; border-radius: 12px; background: #151d26; }
+      .health h2 { margin: 0 0 16px; font-size: 18px; }
+      .health-row { display: flex; justify-content: space-between; gap: 16px; color: #a6b5c4; }
+      .health-row + .health-row { margin-top: 10px; }
+      .status { color: #b4edcf; }
+      .status.unhealthy { color: #ff9b9b; }
     </style>
   </head>
   <body>
@@ -46,6 +52,17 @@
         <a href="/redoc">API reference</a>
         <a href="/openapi.json">OpenAPI schema</a>
       </nav>
+      <section class="health" aria-labelledby="health-title">
+        <h2 id="health-title">System health</h2>
+        <div class="health-row">
+          <span>Overall status</span>
+          <strong class="status {{ 'unhealthy' if health_status == 'unhealthy' else '' }}">{{ health_status|capitalize }}</strong>
+        </div>
+        <div class="health-row">
+          <span>Redis</span>
+          <span><strong class="status {{ 'unhealthy' if health_status == 'unhealthy' else '' }}">{{ health_status|capitalize }}</strong> &middot; {{ health_response_time_ms }} ms</span>
+        </div>
+      </section>
       <footer>Automation &middot; Developer workspace</footer>
     </main>
   </body>
