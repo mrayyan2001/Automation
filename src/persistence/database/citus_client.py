@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Awaitable
+from typing import cast
 
 import asyncpg
 
@@ -29,12 +31,22 @@ class CitusClient(DatabaseClient):
         return "Citus PostgreSQL"
 
     async def health_check(self) -> None:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            await connection.fetchval("SELECT 1")
+
+    async def _get_pool(self) -> asyncpg.Pool:
         if self._pool is None:
             async with self._pool_lock:
                 if self._pool is None:
-                    self._pool = await asyncpg.create_pool(**self._connection_options)
-        async with self._pool.acquire() as connection:
-            await connection.fetchval("SELECT 1")
+                    pool_builder = cast(
+                        Awaitable[asyncpg.Pool],
+                        asyncpg.create_pool(**self._connection_options),
+                    )
+                    self._pool = await pool_builder
+        if self._pool is None:
+            raise RuntimeError("Citus connection pool was not initialized")
+        return self._pool
 
     async def aclose(self) -> None:
         async with self._pool_lock:
