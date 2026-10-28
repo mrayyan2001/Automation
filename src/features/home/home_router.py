@@ -39,7 +39,6 @@ class HomeRouter:
             name=HOME_PAGE.name,
             context={
                 "title": home_service.name,
-                "tags": home_service.tags,
                 "health_status": dependency_status,
                 "health_response_time_ms": dependency_response_time_ms,
             },
