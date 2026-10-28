@@ -36,8 +36,7 @@ exports, not application logic.
 
 - `uv sync`: install locked application dependencies.
 - `uv run src/main.py`: start the server; inspect `/docs`.
-- `PYTHONPATH=src .venv/bin/python -m unittest discover -s test`: run tests.
-- `uv run --with pytest pytest`: run through pytest.
+- `uv run --with pytest pytest -v`: run the test suite with pytest.
 - `uv run --with ruff ruff check .`: lint.
 - `uv run --with ruff ruff format .`: format.
 
@@ -95,7 +94,7 @@ automated tests.
 
 Prefix every API route with `/api/v{version}/` (for example, `/api/v1/tasks`).
 
-Automated tests use unittest, async test cases, and HTTPX ASGI clients. Use `test_*.py` / `test_*`, temporary storage, and cover validation, persistence,
+Automated tests use pytest and HTTPX ASGI clients. Use pytest fixtures and assertions, `test_*.py` / `test_*`, temporary storage, and cover validation, persistence,
 concurrency, and DI.
 
 Always add or update automated test cases for every code change. Run the relevant
@@ -105,8 +104,8 @@ tests before finishing and report the results.
 
 Follow recent `feat(scope): description` commits. PRs explain changes, validation,
 and relevant issues; include HTTP examples or UI screenshots when applicable.
-Group related changes into one focused commit, and keep unrelated changes in
-separate commits.
+Keep each commit focused on one feature or coherent change. Split unrelated
+changes into separate commits; do not combine independent work in one commit.
 Copy `.env.example` to `.env`; never commit secrets, logs, or task data. TXT is
 selected through its qualifier; changing adapters does not migrate existing tasks.
 
