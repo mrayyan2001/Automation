@@ -8,8 +8,11 @@ services:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     environment:
       REDIS_HOST: redis
+      CITUS_HOST: citus
     depends_on:
       redis:
+        condition: service_healthy
+      citus:
         condition: service_healthy
     restart: unless-stopped
 
@@ -24,4 +27,25 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+
+  citus:
+    image: citusdata/citus:14.2-pg17
+    container_name: citus
+    environment:
+      POSTGRES_USER: ${CITUS_USER:-postgres}
+      POSTGRES_PASSWORD: ${CITUS_PASSWORD:-automation}
+      POSTGRES_DB: ${CITUS_DATABASE:-postgres}
+    ports:
+      - "${CITUS_EXTERNAL_PORT:-5432}:5432"
+    volumes:
+      - citus_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CITUS_USER:-postgres} -d ${CITUS_DATABASE:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  citus_data:
 

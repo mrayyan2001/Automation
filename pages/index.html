@@ -59,7 +59,6 @@
       .health-row + .health-row { border-top: 1px solid rgba(190, 207, 190, .1); }
       .service-name { display: flex; align-items: center; gap: 11px; color: #e5eae3; font-weight: 550; }
       .service-icon { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; color: #c5cec4; font-size: 12px; }
-      .redis-icon { width: 17px; height: 17px; color: #e94343; }
       .result { display: flex; align-items: center; gap: 12px; }
       .status { color: var(--green); font-weight: 600; }
       .status.unhealthy { color: #ff9292; }
@@ -102,10 +101,12 @@
             <span class="service-name"><span class="service-icon" aria-hidden="true">API</span>Application</span>
             <span class="result"><strong class="status {{ 'unhealthy' if health_status == 'unhealthy' else '' }}">{{ health_status|capitalize }}</strong></span>
           </div>
+          {% for check in health_checks %}
           <div class="health-row">
-            <span class="service-name"><span class="service-icon" aria-hidden="true"><svg class="redis-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m3.5 7 8.5-4 8.5 4-8.5 4-8.5-4Z" fill="currentColor"/><path d="m3.5 11 8.5 4 8.5-4M3.5 15l8.5 4 8.5-4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Redis</span>
-            <span class="result"><strong class="status {{ 'unhealthy' if health_status == 'unhealthy' else '' }}">{{ health_status|capitalize }}</strong><span class="latency">{{ health_response_time_ms }} ms</span></span>
+            <span class="service-name"><span class="service-icon" aria-hidden="true">{{ check.name[:2]|upper }}</span>{{ check.name }}</span>
+            <span class="result"><strong class="status {{ 'unhealthy' if check.status == 'unhealthy' else '' }}">{{ check.status|capitalize }}</strong><span class="latency">{{ check.response_time_ms }} ms</span></span>
           </div>
+          {% endfor %}
         </section>
       </main>
       <footer><span>{{ title }} &middot; Developer workspace</span><span>API documentation <span aria-hidden="true">&nearr;</span></span></footer>

@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 
+from common.health_check_client import HealthCheckClient
 from context import create_application_context
 from features.otp.service.default_otp_service import DefaultOtpService
 from features.otp.service.otp_service import OtpService
@@ -86,3 +87,9 @@ def test_application_context_discovers_redis_cache_component(
 
     assert isinstance(context.get(CacheClient), RedisClient)
     assert isinstance(context.get(OtpService), DefaultOtpService)
+    assert {
+        client.health_check_name for client in context.get(list[HealthCheckClient])
+    } == {
+        "Redis",
+        "Citus PostgreSQL",
+    }

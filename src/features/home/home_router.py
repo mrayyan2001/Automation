@@ -1,16 +1,13 @@
+import asyncio
 from pathlib import Path
 from time import perf_counter
-from typing import Annotated
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from redis.exceptions import RedisError
 
-from common.annotation.qualifier import Qualifier
 from common.annotation.router import Controller, Get
-from features.home.home_service import HomeService
-from persistence.cache.cache_client import CacheClient
+from common.health_check_client import HealthCheckClient
 
 HOME_PAGE = Path(__file__).resolve().parents[3] / "pages" / "index.html"
 templates = Jinja2Templates(directory=HOME_PAGE.parent)
@@ -22,24 +19,37 @@ class HomeRouter:
     async def home(
         self,
         request: Request,
-        home_service: Annotated[HomeService, Qualifier("MhHomeService")],
-        cache_client: CacheClient,
+        health_check_clients: list[HealthCheckClient],
     ) -> HTMLResponse:
-        dependency_started_at = perf_counter()
-        try:
-            await cache_client.health_check()
-            dependency_status = "healthy"
-        except (RedisError, OSError, TimeoutError):
-            dependency_status = "unhealthy"
-        dependency_response_time_ms = round(
-            (perf_counter() - dependency_started_at) * 1000, 2
+        health_checks = await asyncio.gather(
+            *(check_client(client) for client in health_check_clients)
+        )
+        health_status = (
+            "unhealthy"
+            if any(check["status"] == "unhealthy" for check in health_checks)
+            else "healthy"
         )
         return templates.TemplateResponse(
             request=request,
             name=HOME_PAGE.name,
             context={
-                "title": home_service.name,
-                "health_status": dependency_status,
-                "health_response_time_ms": dependency_response_time_ms,
+                "title": "HM Company",
+                "health_status": health_status,
+                "health_checks": health_checks,
             },
         )
+
+
+async def check_client(client: HealthCheckClient) -> dict[str, str | float]:
+    started_at = perf_counter()
+    try:
+        await client.health_check()
+        status = "healthy"
+    except Exception:  # noqa: BLE001
+        status = "unhealthy"
+    response_time_ms = round((perf_counter() - started_at) * 1000, 2)
+    return {
+        "name": client.health_check_name,
+        "status": status,
+        "response_time_ms": response_time_ms,
+    }
