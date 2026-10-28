@@ -1,14 +1,20 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from typing import Protocol, runtime_checkable
 
 from fastapi import FastAPI
 
 from common.annotation.router import scan_routers, validate_router_dependencies
 from common.config.config import load_config
-from context import create_application_context
+from context import ApplicationContext, create_application_context
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class AsyncClosable(Protocol):
+    async def aclose(self) -> None: ...
 
 
 def log_task_error(task: asyncio.Task) -> None:
@@ -22,7 +28,7 @@ def log_task_error(task: asyncio.Task) -> None:
 async def initialize_context(app: FastAPI) -> None:
     """Discover routes and build dependencies without delaying server startup."""
 
-    packages = ["features", "common"]
+    packages = ["features", "common", "persistence"]
     logger.info("Scanning application controllers in the background...")
     routers = await asyncio.to_thread(scan_routers, packages)
     context = await asyncio.to_thread(
@@ -40,13 +46,18 @@ async def initialize_context(app: FastAPI) -> None:
     logger.info("Application controllers and dependencies are ready.")
 
 
-async def shutdown(tasks: list[asyncio.Task]) -> None:
+async def shutdown(tasks: list[asyncio.Task], app: FastAPI) -> None:
     logger.info("Server shutting down. Cleaning up resources...")
-    for task in tasks:
-        if not task.done():
-            task.cancel()
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+    for task in (task for task in tasks if not task.done()):
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    context: ApplicationContext | None = getattr(app.state, "context", None)
+    if context is None:
+        return
+    for bean in reversed(tuple(context.beans.values())):
+        if isinstance(bean, AsyncClosable):
+            await bean.aclose()
 
 
 @asynccontextmanager
@@ -60,5 +71,5 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        await shutdown([context_task])
+        await shutdown([context_task], app)
     logger.info("Resource cleanup complete.")
